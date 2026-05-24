@@ -4,7 +4,12 @@
       "Bash(git init *)",
       "Bash(git branch *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(mkdir src *)",
+      "Bash(mkdir src/models)",
+      "Bash(mkdir src/controllers)",
+      "Bash(mkdir src/routes)",
+      "Bash(mkdir src/services)"
     ]
   }
 }
