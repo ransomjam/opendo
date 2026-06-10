@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Opendo - Dashboard</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --line:#e2e6ea; --pri:#2563eb; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; --muted:#6b7280; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, Arial, sans-serif; background:var(--bg); color:#111; }
+  header { background:#111827; color:#fff; padding:12px 20px; display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:18px; margin:0; }
+  header .who { font-size:13px; color:#cbd5e1; }
+  main { max-width:1000px; margin:0 auto; padding:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:8px 0 2px; }
+  input, select, textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  button { background:var(--pri); color:#fff; border:0; border-radius:6px; padding:8px 14px; font-size:14px; cursor:pointer; }
+  button.secondary { background:#e5e7eb; color:#111; }
+  button.small { padding:4px 8px; font-size:12px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:160px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap:10px; }
+  .stat { background:#f9fafb; border:1px solid var(--line); border-radius:8px; padding:12px; text-align:center; }
+  .stat .n { font-size:24px; font-weight:700; }
+  .stat .l { font-size:12px; color:var(--muted); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; }
+  .excellent_fit{background:#dcfce7;color:#166534}
+  .strong_fit{background:#dbeafe;color:#1e40af}
+  .possible_fit{background:#fef9c3;color:#854d0e}
+  .weak_fit{background:#fee2e2;color:#991b1b}
+  .not_recommended{background:#f3f4f6;color:#374151}
+  .score { font-size:28px; font-weight:800; }
+  .muted { color:var(--muted); font-size:13px; }
+  .opp { border:1px solid var(--line); border-radius:8px; padding:14px; margin-bottom:12px; }
+  .opp h3 { margin:0 0 4px; font-size:15px; }
+  ul { margin:6px 0; padding-left:18px; font-size:13px; }
+  .pill { display:inline-block; background:#eef2ff; color:#3730a3; border-radius:6px; padding:2px 6px; font-size:11px; margin:2px 2px 0 0; }
+  .danger { color:var(--bad); }
+  .hidden { display:none; }
+  #toast { position:fixed; bottom:20px; right:20px; background:#111827; color:#fff; padding:10px 14px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; }
+  #toast.show { opacity:1; }
+  .tag { font-size:11px; padding:2px 6px; border-radius:6px; background:#f3f4f6; color:#374151; }
+  .flex-between { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+</style>
+<link rel="stylesheet" href="/assets/opendo.css" />
+</head>
+<body>
+<header>
+  <h1>Opendo Dashboard</h1>
+  <div class="who"><span id="whoami">Not signed in</span> <button id="logoutBtn" class="small secondary hidden">Logout</button></div>
+</header>
+
+<main>
+  <!-- AUTH -->
+  <section id="authCard" class="card">
+    <h2>Sign in to Opendo</h2>
+    <div class="row">
+      <div>
+        <label>Full name (register only)</label>
+        <input id="authName" placeholder="Jane Doe" />
+      </div>
+      <div>
+        <label>Email</label>
+        <input id="authEmail" placeholder="you@example.com" />
+      </div>
+      <div>
+        <label>Password</label>
+        <input id="authPassword" type="password" placeholder="Password" />
+      </div>
+    </div>
+    <div style="margin-top:12px; display:flex; gap:10px;">
+      <button onclick="doLogin()">Login</button>
+      <button class="secondary" onclick="doRegister()">Register</button>
+    </div>
+    <p class="muted" id="authMsg"></p>
+  </section>
+
+  <div id="app" class="hidden">
+
+    <!-- ASK OPENDO AI (main interface) -->
+    <section class="card" id="aiCard" style="border:2px solid var(--pri)">
+      <div class="flex-between">
+        <h2>Ask Opendo AI</h2>
+        <span class="muted" id="aiStatus"></span>
+      </div>
+      <p class="muted">Tell Opendo what you need: find opportunities, update your profile, paste a listing, or get a focused action plan.</p>
+      <textarea id="aiInput" rows="3" placeholder="e.g. Find grants and networking opportunities for my tech startup in Cameroon"></textarea>
+      <div class="row" style="margin-top:8px; align-items:flex-end">
+        <div style="flex:0 0 230px">
+          <label>Mode</label>
+          <select id="aiMode">
+            <option value="auto">Auto</option>
+            <option value="profile">Update my profile</option>
+            <option value="research">Find opportunities online</option>
+            <option value="opportunity">Paste opportunity</option>
+            <option value="matching">What fits me best?</option>
+            <option value="action_plan">What should I do today?</option>
+          </select>
+        </div>
+        <div style="flex:0">
+          <button id="aiSendBtn" onclick="askAI()">Send</button>
+        </div>
+      </div>
+      <div id="examplePrompts" style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap"></div>
+      <div id="aiResponse" style="margin-top:14px"></div>
+    </section>
+
+    <!-- SUMMARY -->
+    <section class="card">
+      <div class="flex-between">
+        <h2>Overview</h2>
+        <div>
+          <button class="small" onclick="recalculate()">Recalculate matches</button>
+          <button class="small secondary" onclick="loadAll()">Refresh</button>
+        </div>
+      </div>
+      <div class="grid" id="summaryGrid"></div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="card">
+      <h2>My Profile</h2>
+      <div style="background:#f9fafb; border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:12px">
+        <strong style="font-size:14px">Tell Opendo about yourself</strong>
+        <p class="muted" style="margin:4px 0">Paste a few lines about yourself and AI will fill in your profile below (preferred). The manual form still works as a backup.</p>
+        <textarea id="profileHelperInput" rows="2" placeholder="I am a founder in Cameroon working in education technology. I need funding and networking. I have a CV and passport, but no pitch deck."></textarea>
+        <div style="margin-top:8px"><button class="small" onclick="updateProfileFromText()">Update my profile with AI</button></div>
+        <p class="muted" id="profileHelperMsg"></p>
+      </div>
+      <div class="row">
+        <div><label>Country</label><input id="p_country" /></div>
+        <div><label>City</label><input id="p_city" /></div>
+        <div><label>Profession</label><input id="p_profession" /></div>
+        <div><label>Education level</label><input id="p_educationLevel" /></div>
+      </div>
+      <div class="row">
+        <div><label>Business type</label><input id="p_businessType" /></div>
+        <div><label>Business stage</label><input id="p_businessStage" /></div>
+        <div><label>Funding needs</label><input id="p_fundingNeeds" /></div>
+      </div>
+      <div class="row">
+        <div><label>Skills (comma separated)</label><input id="p_skills" /></div>
+        <div><label>Sector interests (comma separated)</label><input id="p_sectorInterests" /></div>
+      </div>
+      <div class="row">
+        <div><label>Preferred opportunity types (comma separated)</label><input id="p_preferredOpportunityTypes" placeholder="grant, fellowship" /></div>
+        <div><label>Portfolio links (comma separated)</label><input id="p_portfolioLinks" /></div>
+      </div>
+      <label>Bio</label>
+      <textarea id="p_bio" rows="2"></textarea>
+      <div class="row" style="margin-top:8px">
+        <div><label><input type="checkbox" id="p_travelAvailable" style="width:auto"> Travel available</label></div>
+        <div><label><input type="checkbox" id="p_passportAvailable" style="width:auto"> Passport available</label></div>
+        <div><label><input type="checkbox" id="p_businessRegistered" style="width:auto"> Business registered</label></div>
+      </div>
+      <div style="margin-top:12px"><button onclick="saveProfile()">Save profile</button></div>
+      <p class="muted" id="profileMsg"></p>
+    </section>
+
+    <!-- DOCUMENTS -->
+    <section class="card">
+      <h2>My Documents</h2>
+      <div class="row">
+        <div>
+          <label>Document type</label>
+          <select id="docType"></select>
+        </div>
+        <div>
+          <label>File</label>
+          <input type="file" id="docFile" />
+        </div>
+        <div style="display:flex; align-items:flex-end">
+          <button onclick="uploadDoc()">Upload</button>
+        </div>
+      </div>
+      <p class="muted" id="docMsg"></p>
+      <div id="docList"></div>
+    </section>
+
+    <!-- MATCHES -->
+    <section class="card">
+      <div class="flex-between">
+        <h2>My Matches</h2>
+        <div class="row" style="flex:0">
+          <select id="filterLevel" onchange="renderMatches()">
+            <option value="">All levels</option>
+            <option value="excellent_fit">Excellent</option>
+            <option value="strong_fit">Strong</option>
+            <option value="possible_fit">Possible</option>
+            <option value="weak_fit">Weak</option>
+            <option value="not_recommended">Not recommended</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted" id="matchMsg">Click "Recalculate matches" to generate matches from published opportunities.</p>
+      <div id="matchList"></div>
+    </section>
+
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+/*
+ * NOTE ON EXISTING ENDPOINTS
+ * This page calls the auth/profile/documents endpoints defensively because their
+ * exact request/response shape may vary:
+ *  - Login/Register: POST /api/auth/login & /api/auth/register with {fullName,email,password}.
+ *    The JWT is read from token | accessToken | data.token.
+ *  - Profile:  GET /api/profile ; save tries PUT then POST /api/profile.
+ *  - Documents: GET /api/documents ; upload POSTs multipart to /api/documents with the
+ *    file under field name "file" plus a "documentType" field.
+ */
+const DOC_TYPES = ['cv','business_registration','pitch_deck','portfolio','passport','tax_certificate','recommendation_letter','concept_note','budget','academic_transcript','other'];
+
+let TOKEN = localStorage.getItem('opendo_token') || '';
+let USER = JSON.parse(localStorage.getItem('opendo_user') || 'null');
+let MATCHES = [];
+let OPPS = {};
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function headers(extra={}){ const h={...extra}; if(TOKEN) h['Authorization']='Bearer '+TOKEN; return h; }
+
+async function api(path, opts={}){
+  const res = await fetch(path, opts);
+  let body=null; try{ body=await res.json(); }catch(e){}
+  // A 401 while we hold a token means the session is no longer valid (e.g. the
+  // server restarted with a different JWT secret). Force a clean re-login.
+  if(res.status===401 && TOKEN){ sessionExpired(); throw new Error('Session expired - please log in again.'); }
+  if(!res.ok){
+    const msg=(body&&(body.errors&&body.errors.length > 0 ? body.errors.join('; ') : body.message))||('HTTP '+res.status);
+    throw new Error(msg);
+  }
+  return body;
+}
+let _sessionExpiredShown=false;
+function sessionExpired(){
+  if(_sessionExpiredShown) return; _sessionExpiredShown=true;
+  TOKEN=''; USER=null;
+  localStorage.removeItem('opendo_token'); localStorage.removeItem('opendo_user');
+  const app=document.getElementById('app'); if(app) app.classList.add('hidden');
+  const auth=document.getElementById('authCard'); if(auth) auth.classList.remove('hidden');
+  const lo=document.getElementById('logoutBtn'); if(lo) lo.classList.add('hidden');
+  const who=document.getElementById('whoami'); if(who) who.textContent='Not signed in';
+  const m=document.getElementById('authMsg'); if(m) m.textContent='Your session expired. Please log in again.';
+}
+function jsonPost(path, data, method='POST'){
+  return api(path,{method,headers:headers({'Content-Type':'application/json'}),body:JSON.stringify(data)});
+}
+
+function authExtractToken(body){ return body.token || body.accessToken || (body.data&&body.data.token) || ''; }
+function authExtractUser(body){ return body.user || (body.data&&body.data.user) || (body.data&&body.data.id?body.data:null); }
+
+async function doRegister(){
+  const fullName=val('authName'), email=val('authEmail'), password=val('authPassword');
+  try{
+    const body=await jsonPost('/api/auth/register',{fullName,email,password});
+    afterAuth(body, email);
+  }catch(e){ document.getElementById('authMsg').textContent='Register failed: '+e.message; }
+}
+async function doLogin(){
+  const email=val('authEmail'), password=val('authPassword');
+  try{
+    const body=await jsonPost('/api/auth/login',{email,password});
+    afterAuth(body, email);
+  }catch(e){ document.getElementById('authMsg').textContent='Login failed: '+e.message; }
+}
+function afterAuth(body, email){
+  TOKEN=authExtractToken(body);
+  if(!TOKEN){ document.getElementById('authMsg').textContent='No token returned by server. Check the auth response shape.'; return; }
+  USER=authExtractUser(body)||{email};
+  localStorage.setItem('opendo_token',TOKEN);
+  localStorage.setItem('opendo_user',JSON.stringify(USER));
+  showApp();
+  loadAll();
+}
+function logout(){ TOKEN=''; USER=null; localStorage.removeItem('opendo_token'); localStorage.removeItem('opendo_user'); location.reload(); }
+
+function showApp(){
+  document.getElementById('authCard').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('logoutBtn').classList.remove('hidden');
+  document.getElementById('whoami').textContent = (USER&&(USER.fullName||USER.email))||'Signed in';
+}
+
+function val(id){ return document.getElementById(id).value.trim(); }
+function setVal(id,v){ const el=document.getElementById(id); if(el) el.value=v==null?'':v; }
+function csv(v){ return (v||'').split(',').map(s=>s.trim()).filter(Boolean); }
+
+// ---- Profile ----
+async function loadProfile(){
+  try{
+    const body=await api('/api/profile',{headers:headers()});
+    const p=(body&&(body.data||body.profile))||{};
+    setVal('p_country',p.country); setVal('p_city',p.city); setVal('p_profession',p.profession);
+    setVal('p_educationLevel',p.educationLevel); setVal('p_businessType',p.businessType);
+    setVal('p_businessStage',p.businessStage); setVal('p_fundingNeeds',p.fundingNeeds);
+    setVal('p_skills',(p.skills||[]).join(', ')); setVal('p_sectorInterests',(p.sectorInterests||[]).join(', '));
+    setVal('p_preferredOpportunityTypes',(p.preferredOpportunityTypes||[]).join(', '));
+    setVal('p_portfolioLinks',(p.portfolioLinks||[]).join(', ')); setVal('p_bio',p.bio);
+    document.getElementById('p_travelAvailable').checked=!!p.travelAvailable;
+    document.getElementById('p_passportAvailable').checked=!!p.passportAvailable;
+    document.getElementById('p_businessRegistered').checked=!!p.businessRegistered;
+  }catch(e){ /* profile may not exist yet */ }
+}
+async function saveProfile(){
+  const payload={
+    country:val('p_country'), city:val('p_city'), profession:val('p_profession'),
+    educationLevel:val('p_educationLevel'), businessType:val('p_businessType'),
+    businessStage:val('p_businessStage'), fundingNeeds:val('p_fundingNeeds'),
+    skills:csv(val('p_skills')), sectorInterests:csv(val('p_sectorInterests')),
+    preferredOpportunityTypes:csv(val('p_preferredOpportunityTypes')),
+    portfolioLinks:csv(val('p_portfolioLinks')), bio:val('p_bio'),
+    travelAvailable:document.getElementById('p_travelAvailable').checked,
+    passportAvailable:document.getElementById('p_passportAvailable').checked,
+    businessRegistered:document.getElementById('p_businessRegistered').checked
+  };
+  try{
+    try { await jsonPost('/api/profile',payload,'PUT'); }
+    catch(e){ await jsonPost('/api/profile',payload,'POST'); }
+    document.getElementById('profileMsg').textContent='Profile saved.'; toast('Profile saved');
+  }catch(e){ document.getElementById('profileMsg').textContent='Save failed: '+e.message; }
+}
+
+// ---- Documents ----
+function fillDocTypes(){
+  const sel=document.getElementById('docType');
+  sel.innerHTML=DOC_TYPES.map(t=>`<option value="${t}">${t}</option>`).join('');
+}
+async function loadDocuments(){
+  try{
+    const body=await api('/api/documents',{headers:headers()});
+    const docs=(body&&(body.data||body.documents))||[];
+    window._docTypes=docs.map(d=>d.documentType);
+    document.getElementById('docList').innerHTML = docs.length
+      ? docs.map(d=>`<div class="flex-between" style="padding:6px 0;border-bottom:1px solid var(--line)">
+          <span><span class="tag">${d.documentType}</span> ${d.originalName||d.storedName||''}</span>
+          <span class="muted">${d.status||''}</span></div>`).join('')
+      : '<p class="muted">No documents uploaded yet.</p>';
+  }catch(e){ document.getElementById('docList').innerHTML='<p class="muted">Could not load documents: '+e.message+'</p>'; }
+}
+async function uploadDoc(){
+  const fileEl=document.getElementById('docFile');
+  if(!fileEl.files.length){ document.getElementById('docMsg').textContent='Choose a file first.'; return; }
+  const fd=new FormData();
+  fd.append('documentType', document.getElementById('docType').value);
+  fd.append('file', fileEl.files[0]); // matches upload.single('file') in src/routes/documents.js
+  try{
+    await api('/api/documents',{method:'POST',headers:headers(),body:fd});
+    document.getElementById('docMsg').textContent='Uploaded.'; toast('Document uploaded');
+    fileEl.value=''; loadDocuments();
+  }catch(e){ document.getElementById('docMsg').textContent='Upload failed: '+e.message; }
+}
+
+// ---- Matches + summary ----
+async function recalculate(){
+  document.getElementById('matchMsg').textContent='Recalculating...';
+  try{
+    await jsonPost('/api/matches/recalculate',{});
+    toast('Matches recalculated');
+    await loadAll();
+  }catch(e){ document.getElementById('matchMsg').textContent='Recalculate failed: '+e.message; }
+}
+async function loadSummary(){
+  try{
+    const body=await api('/api/dashboard/summary',{headers:headers()});
+    const s=body.summary||{};
+    const items=[
+      ['Total matches',s.totalMatches],['Excellent',s.excellentFits],['Strong',s.strongFits],
+      ['Deadlines this week',s.deadlinesThisWeek],['Missing documents',s.missingDocumentsCount],
+      ['Pending steps',s.pendingActionSteps],['Saved',s.savedOpportunities],['Interested',s.interestedOpportunities]
+    ];
+    document.getElementById('summaryGrid').innerHTML=items.map(([l,n])=>`<div class="stat"><div class="n">${n??0}</div><div class="l">${l}</div></div>`).join('');
+  }catch(e){ document.getElementById('summaryGrid').innerHTML='<p class="muted">Summary unavailable: '+e.message+'</p>'; }
+}
+async function loadOpps(){
+  try{ const body=await api('/api/opportunities?status=published',{headers:headers()});
+    (body.data||[]).forEach(o=>OPPS[o.id]=o);
+  }catch(e){}
+}
+async function loadMatches(){
+  try{
+    const body=await api('/api/matches',{headers:headers()});
+    MATCHES=body.data||[];
+  }catch(e){ MATCHES=[]; }
+  renderMatches();
+}
+async function loadSteps(matchOppId){
+  try{ const body=await api('/api/action-steps/'+encodeURIComponent(matchOppId),{headers:headers()});
+    return body.data||[];
+  }catch(e){ return []; }
+}
+function renderMatches(){
+  const lvl=document.getElementById('filterLevel').value;
+  const list=MATCHES.filter(m=>!lvl||m.matchLevel===lvl);
+  const msg=document.getElementById('matchMsg');
+  if(!list.length){ msg.textContent='No matches yet. Add a published opportunity (admin), complete your profile, then Recalculate.'; document.getElementById('matchList').innerHTML=''; return; }
+  msg.textContent='';
+  document.getElementById('matchList').innerHTML=list.map(m=>{
+    const o=OPPS[m.opportunityId]||{};
+    const reasons=(m.matchReasons||[]).map(r=>`<li>${esc(r)}</li>`).join('');
+    const concerns=(m.possibleConcerns||[]).map(r=>`<li class="danger">${esc(r)}</li>`).join('');
+    const missing=(m.missingDocuments||[]).map(d=>`<span class="pill">${esc(d)}</span>`).join('')||'<span class="muted">none detected</span>';
+    const steps=(m.recommendedNextSteps||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+    return `<div class="opp">
+      <div class="flex-between">
+        <h3>${esc(o.title||'(opportunity)')}</h3>
+        <div style="text-align:right">
+          <div class="score">${m.matchScore}</div>
+          <span class="badge ${m.matchLevel}">${m.matchLevel.replace('_',' ')}</span>
+        </div>
+      </div>
+      <div class="muted">${esc(o.organisation||'')} ${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
+      <div style="margin:6px 0"><span class="tag">Eligibility: ${m.eligibilityStatus.replace('_',' ')}</span>
+        <span class="tag">Status: ${m.status}</span> ${m.aiEnhanced?'<span class="tag">AI</span>':''}</div>
+      <div class="row">
+        <div><strong>Why it matches</strong><ul>${reasons||'<li class="muted">No details yet</li>'}</ul></div>
+        <div><strong>Possible concerns</strong><ul>${concerns||'<li class="muted">No concerns detected</li>'}</ul></div>
+      </div>
+      <div><strong>Missing documents:</strong> ${missing}</div>
+      <div><strong>Next steps</strong><ul>${steps||'<li class="muted">No next steps yet</li>'}</ul></div>
+      <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+        ${['saved','interested','applying','submitted','ignored'].map(s=>`<button class="small ${m.status===s?'':'secondary'}" onclick="setStatus('${m.id}','${s}')">${s}</button>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function setStatus(matchId,status){
+  try{ await jsonPost('/api/matches/'+encodeURIComponent(matchId)+'/status',{status},'PATCH');
+    toast('Marked '+status); await loadMatches(); await loadSummary();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function escAttr(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---- Ask Opendo AI ----
+const EXAMPLES=[
+  {label:'Find grants for my business', text:'Find grants for my business', mode:'research'},
+  {label:'Find exhibitions near me', text:'Find exhibitions and trade fairs relevant to my business and location', mode:'research'},
+  {label:'Find startup funding in Africa', text:'Find startup funding opportunities in Africa for an early-stage tech company', mode:'research'},
+  {label:'Update my profile from this text', text:'I am a tech founder in Cameroon. I run a small software business and I am looking for grants, startup funding, exhibitions, and networking. I have a CV but no pitch deck yet.', mode:'profile'},
+  {label:'What should I do today?', text:'What should I do today?', mode:'action_plan'},
+  {label:'What opportunities fit me best?', text:'What opportunities fit me best?', mode:'matching'}
+];
+function renderExamples(){
+  document.getElementById('examplePrompts').innerHTML = EXAMPLES.map((e,i)=>`<button class="small secondary" onclick="runExample(${i})">${esc(e.label)}</button>`).join('');
+}
+function runExample(i){
+  const e=EXAMPLES[i];
+  document.getElementById('aiInput').value=e.text;
+  document.getElementById('aiMode').value=e.mode;
+  askAI();
+}
+async function loadAIStatus(){
+  try{
+    const b=await api('/api/assistant/status',{headers:headers()});
+    const el=document.getElementById('aiStatus');
+    if(b.aiEnabled){ el.textContent='AI: on (Gemini)'; el.style.color='var(--ok)'; }
+    else { el.textContent='AI: off - '+(b.reason||'not configured'); el.style.color='var(--warn)'; }
+  }catch(e){}
+}
+async function askAI(){
+  const message=document.getElementById('aiInput').value.trim();
+  const mode=document.getElementById('aiMode').value;
+  if(!message){ toast('Type something first'); return; }
+  const out=document.getElementById('aiResponse');
+  const btn=document.getElementById('aiSendBtn'); const old=btn.textContent;
+  btn.disabled=true; btn.textContent='Working...';
+  out.innerHTML='<p class="muted">Thinking...</p>';
+  try{
+    const body=await jsonPost('/api/assistant/chat',{message,mode});
+    renderAIResponse(body);
+    loadSummary(); loadMatches();
+    if(body.intent==='update_profile') loadProfile();
+  }catch(e){ out.innerHTML='<p class="danger">'+esc(e.message)+'</p>'; }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+function renderAIResponse(body){
+  const out=document.getElementById('aiResponse');
+  const ok=body.success!==false;
+  let html=`<div class="opp" style="background:${ok?'#f0f9ff':'#fef2f2'}"><div style="white-space:pre-wrap">${esc(body.message||'')}</div></div>`;
+  if(body.confirmationQuestion){ html+=`<p class="muted">Tip: reply again confirming the change, or edit the profile form below.</p>`; }
+  const cards=body.opportunities||(body.opportunity?[body.opportunity]:[]);
+  if(cards&&cards.length){ html+=cards.map(renderOppCard).join(''); }
+  if(body.intent==='action_plan'&&body.plan&&body.plan.hasPlan){ html+=renderPlanExtras(body.plan); }
+  out.innerHTML=html;
+}
+function renderOppCard(o){
+  const m=o.match||{};
+  const missing=(m.missingDocuments||[]).map(d=>`<span class="pill">${esc(d)}</span>`).join('')||'<span class="muted">none detected</span>';
+  const steps=(m.recommendedNextSteps||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+  const appLink=o.applicationLink||o.sourceUrl||'';
+  const srcLink=o.sourceUrl||'';
+  const score=(m.matchScore!=null&&m.matchScore!=='')?m.matchScore:'';
+  const level=m.matchLevel||'';
+  const statusBtns=m.matchId?['saved','interested','applying','submitted','ignored'].map(s=>`<button class="small ${m.status===s?'':'secondary'}" onclick="setStatus('${m.matchId}','${s}')">${s}</button>`).join(''):'';
+  return `<div class="opp">
+    <div class="flex-between">
+      <h3>${esc(o.title||'(opportunity)')}</h3>
+      <div style="text-align:right">${score!==''?`<div class="score">${score}</div>`:''}${level?`<span class="badge ${level}">${esc(level.replace(/_/g,' '))}</span>`:''}</div>
+    </div>
+    <div class="muted">${esc(o.organisation||'')}${o.category?(' - '+esc(o.category)):''}${o.location?(' - '+esc(o.location)):''}${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
+    <div style="margin:6px 0"><strong>Missing documents:</strong> ${missing}</div>
+    ${steps?`<div><strong>Do next</strong><ul>${steps}</ul></div>`:''}
+    <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+      ${appLink?`<a href="${escAttr(appLink)}" target="_blank" rel="noopener"><button class="small">Open Application Link</button></a>`:''}
+      ${srcLink?`<a href="${escAttr(srcLink)}" target="_blank" rel="noopener"><button class="small secondary">Open Source</button></a>`:''}
+    </div>
+    ${statusBtns?`<div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">${statusBtns}</div>`:''}
+  </div>`;
+}
+function renderPlanExtras(p){
+  const urgent=(p.urgentDeadlines||[]).map(u=>`<li>${esc(u.title)} - ${u.days===0?'today':('in '+u.days+' day(s)')} ${u.applicationLink?`<a href="${escAttr(u.applicationLink)}" target="_blank" rel="noopener">open</a>`:''}</li>`).join('');
+  let html='';
+  if(p.focus&&p.focus.applicationLink){ html+=`<div style="margin-top:8px"><a href="${escAttr(p.focus.applicationLink)}" target="_blank" rel="noopener"><button class="small">Open application link</button></a></div>`; }
+  if(urgent){ html+=`<div class="opp"><strong>Urgent deadlines</strong><ul>${urgent}</ul></div>`; }
+  return html;
+}
+async function updateProfileFromText(){
+  const message=document.getElementById('profileHelperInput').value.trim();
+  if(!message){ document.getElementById('profileHelperMsg').textContent='Paste something about yourself first.'; return; }
+  try{
+    const body=await jsonPost('/api/assistant/chat',{message,mode:'profile'});
+    document.getElementById('profileHelperMsg').textContent=body.message||'';
+    toast('Profile updated'); loadProfile(); loadSummary();
+  }catch(e){ document.getElementById('profileHelperMsg').textContent='Failed: '+e.message; }
+}
+
+async function loadAll(){ await loadOpps(); await Promise.all([loadAIStatus(),loadProfile(),loadDocuments(),loadSummary(),loadMatches()]); }
+
+document.getElementById('logoutBtn').onclick=logout;
+fillDocTypes();
+renderExamples();
+if(TOKEN){ showApp(); loadAll(); }
+</script>
+</body>
+</html>

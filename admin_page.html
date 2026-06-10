@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Opendo - Admin</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Arial,sans-serif; background:#f4f6f8; color:#111; }
+  header { background:#111827; color:#fff; padding:12px 20px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:18px; margin:0; }
+  main { max-width:1000px; margin:0 auto; padding:20px; }
+  .card { background:#fff; border:1px solid #e2e6ea; border-radius:10px; padding:16px; margin-bottom:16px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:12px; color:#6b7280; margin:8px 0 2px; }
+  input, select, textarea { width:100%; padding:8px; border:1px solid #e2e6ea; border-radius:6px; font-size:14px; }
+  button { background:#2563eb; color:#fff; border:0; border-radius:6px; padding:8px 14px; cursor:pointer; font-size:14px; }
+  button.secondary { background:#e5e7eb; color:#111; }
+  button.small { padding:4px 8px; font-size:12px; }
+  button.danger { background:#dc2626; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:180px; }
+  .muted { color:#6b7280; font-size:13px; }
+  .opp { border:1px solid #e2e6ea; border-radius:8px; padding:12px; margin-bottom:10px; }
+  .tag { font-size:11px; padding:2px 6px; border-radius:6px; background:#f3f4f6; color:#374151; }
+  .hidden { display:none; }
+  #toast { position:fixed; bottom:20px; right:20px; background:#111827; color:#fff; padding:10px 14px; border-radius:8px; font-size:13px; opacity:0; transition:.2s; }
+  #toast.show { opacity:1; }
+  .flex-between { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+</style>
+<link rel="stylesheet" href="/assets/opendo.css" />
+</head>
+<body>
+<header>
+  <h1>Opendo Admin</h1>
+  <div><span id="whoami" class="muted">Not signed in</span> <button id="logoutBtn" class="small secondary hidden">Logout</button></div>
+</header>
+<main>
+  <section id="authCard" class="card">
+    <h2>Admin login</h2>
+    <div class="row">
+      <div><label>Email</label><input id="email" placeholder="admin@example.com" /></div>
+      <div><label>Password</label><input id="password" type="password" /></div>
+      <div style="display:flex;align-items:flex-end"><button onclick="login()">Login</button></div>
+    </div>
+    <p class="muted">Create an admin with <code>npm run create-admin</code> (see .env). A non-admin login will be rejected by admin-only endpoints.</p>
+    <p class="muted danger" id="authMsg"></p>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="card">
+      <h2 id="formTitle">Create opportunity</h2>
+      <input type="hidden" id="f_id" />
+      <div class="row">
+        <div><label>Title *</label><input id="f_title" /></div>
+        <div><label>Organisation *</label><input id="f_organisation" /></div>
+      </div>
+      <div class="row">
+        <div><label>Category *</label><select id="f_category"></select></div>
+        <div><label>Deadline * (YYYY-MM-DD)</label><input id="f_deadline" placeholder="2026-09-30" /></div>
+        <div><label>Status</label><select id="f_status"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Country scope</label><input id="f_countryScope" /></div>
+        <div><label>Location</label><input id="f_location" /></div>
+        <div><label>Risk level</label><select id="f_riskLevel"></select></div>
+      </div>
+      <div class="row">
+        <div><label>Funding amount</label><input id="f_fundingAmount" /></div>
+        <div><label>Application link * (https://...)</label><input id="f_applicationLink" /></div>
+      </div>
+      <label>Description *</label><textarea id="f_description" rows="2"></textarea>
+      <label>Eligibility *</label><textarea id="f_eligibility" rows="2"></textarea>
+      <label>Required documents (free text, e.g. "CV, pitch deck, business registration")</label><textarea id="f_requiredDocuments" rows="2"></textarea>
+      <label>Benefits</label><textarea id="f_benefits" rows="2"></textarea>
+      <label>Application steps</label><textarea id="f_applicationSteps" rows="2"></textarea>
+      <div style="margin-top:12px; display:flex; gap:10px">
+        <button onclick="saveOpp()">Save</button>
+        <button class="secondary" onclick="resetForm()">Clear</button>
+      </div>
+      <p class="muted" id="formMsg"></p>
+    </section>
+
+    <section class="card">
+      <div class="flex-between">
+        <h2>All opportunities</h2>
+        <div class="row" style="flex:0; align-items:center; gap:6px">
+          <select id="statusFilter" onchange="renderOpps()" style="min-width:170px">
+            <option value="">All statuses</option>
+            <option value="personal_research">Personal research</option>
+            <option value="review">Review queue</option>
+            <option value="published">Published</option>
+            <option value="suspicious">Suspicious</option>
+            <option value="expired">Expired</option>
+          </select>
+          <button class="small secondary" onclick="loadOpps()">Refresh</button>
+        </div>
+      </div>
+      <p class="muted">Users see their own researched opportunities immediately. Use <strong>Publish globally</strong> to make a good one visible to everyone.</p>
+      <div id="oppList"></div>
+    </section>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const CATEGORIES=['grant','funding','exhibition','networking','fellowship','training','competition','tender','scholarship','startup_programme','other'];
+const STATUSES=['draft','review','published','personal_research','closed','expired','suspicious'];
+const RISKS=['low','medium','high','unverified'];
+let TOKEN=localStorage.getItem('opendo_admin_token')||'';
+
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function headers(extra={}){const h={...extra};if(TOKEN)h['Authorization']='Bearer '+TOKEN;return h;}
+async function api(path,opts={}){const res=await fetch(path,opts);let b=null;try{b=await res.json();}catch(e){}if(!res.ok){throw new Error((b&&(b.errors&&b.errors.length > 0 ? b.errors.join('; ') : b.message))||('HTTP '+res.status));}return b;}
+function jpost(path,data,method='POST'){return api(path,{method,headers:headers({'Content-Type':'application/json'}),body:JSON.stringify(data)});}
+function val(id){return document.getElementById(id).value.trim();}
+function setVal(id,v){document.getElementById(id).value=v==null?'':v;}
+function opts(arr){return arr.map(x=>`<option value="${x}">${x}</option>`).join('');}
+function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+async function login(){
+  try{
+    const b=await jpost('/api/auth/login',{email:val('email'),password:val('password')});
+    TOKEN=b.token||b.accessToken||(b.data&&b.data.token)||'';
+    if(!TOKEN){document.getElementById('authMsg').textContent='No token returned by server.';return;}
+    localStorage.setItem('opendo_admin_token',TOKEN);
+    showApp(); loadOpps();
+  }catch(e){document.getElementById('authMsg').textContent='Login failed: '+e.message;}
+}
+function logout(){TOKEN='';localStorage.removeItem('opendo_admin_token');location.reload();}
+function showApp(){document.getElementById('authCard').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('logoutBtn').classList.remove('hidden');document.getElementById('whoami').textContent='Signed in';}
+
+function resetForm(){
+  ['f_id','f_title','f_organisation','f_deadline','f_countryScope','f_location','f_fundingAmount','f_applicationLink','f_description','f_eligibility','f_requiredDocuments','f_benefits','f_applicationSteps'].forEach(i=>setVal(i,''));
+  document.getElementById('f_category').value='grant';
+  document.getElementById('f_status').value='draft';
+  document.getElementById('f_riskLevel').value='unverified';
+  document.getElementById('formTitle').textContent='Create opportunity';
+  document.getElementById('formMsg').textContent='';
+}
+function collect(){
+  return {
+    title:val('f_title'),organisation:val('f_organisation'),category:val('f_category'),
+    deadline:val('f_deadline'),status:val('f_status'),countryScope:val('f_countryScope'),
+    location:val('f_location'),riskLevel:val('f_riskLevel'),fundingAmount:val('f_fundingAmount'),
+    applicationLink:val('f_applicationLink'),description:val('f_description'),eligibility:val('f_eligibility'),
+    requiredDocuments:val('f_requiredDocuments'),benefits:val('f_benefits'),applicationSteps:val('f_applicationSteps')
+  };
+}
+async function saveOpp(){
+  const id=val('f_id'); const payload=collect();
+  try{
+    if(id){ await jpost('/api/opportunities/'+encodeURIComponent(id),payload,'PUT'); toast('Updated'); }
+    else { await jpost('/api/opportunities',payload,'POST'); toast('Created'); }
+    resetForm(); loadOpps();
+  }catch(e){ document.getElementById('formMsg').textContent='Save failed: '+e.message; }
+}
+function edit(o){
+  setVal('f_id',o.id);setVal('f_title',o.title);setVal('f_organisation',o.organisation);
+  document.getElementById('f_category').value=o.category||'grant';
+  setVal('f_deadline',o.deadline);document.getElementById('f_status').value=o.status||'draft';
+  setVal('f_countryScope',o.countryScope);setVal('f_location',o.location);
+  document.getElementById('f_riskLevel').value=o.riskLevel||'unverified';
+  setVal('f_fundingAmount',o.fundingAmount);setVal('f_applicationLink',o.applicationLink);
+  setVal('f_description',o.description);setVal('f_eligibility',o.eligibility);
+  setVal('f_requiredDocuments',o.requiredDocuments);setVal('f_benefits',o.benefits);
+  setVal('f_applicationSteps',o.applicationSteps);
+  document.getElementById('formTitle').textContent='Edit opportunity';
+  window.scrollTo(0,0);
+}
+async function setStatus(id,status){ try{ await jpost('/api/opportunities/'+encodeURIComponent(id)+'/status',{status},'PATCH'); toast(status); loadOpps(); }catch(e){ toast('Failed: '+e.message); } }
+async function publishGlobally(id){ if(!confirm('Publish this opportunity to ALL users?'))return; try{ await jpost('/api/opportunities/'+encodeURIComponent(id)+'/publish',{}); toast('Published globally'); loadOpps(); }catch(e){ toast('Failed: '+e.message); } }
+async function del(id){ if(!confirm('Delete this opportunity?'))return; try{ await api('/api/opportunities/'+encodeURIComponent(id),{method:'DELETE',headers:headers()}); toast('Deleted'); loadOpps(); }catch(e){ toast('Failed: '+e.message); } }
+
+let OPPS=[];
+async function loadOpps(){
+  try{
+    const b=await api('/api/opportunities',{headers:headers()});
+    OPPS=b.data||[];
+    renderOpps();
+  }catch(e){ document.getElementById('oppList').innerHTML='<p class="muted">Could not load: '+e.message+'</p>'; }
+}
+function renderOpps(){
+  const filter=document.getElementById('statusFilter').value;
+  const list=OPPS.filter(o=>!filter||o.status===filter);
+  document.getElementById('oppList').innerHTML = list.length ? list.map(o=>{
+    const src=o.sourceUrl||o.applicationLink||'';
+    const isResearch=o.status==='personal_research'||o.status==='review';
+    return `
+      <div class="opp">
+        <div class="flex-between">
+          <strong>${esc(o.title)}</strong>
+          <span><span class="tag">${esc(o.status)}</span> <span class="tag">${esc(o.visibility||'public')}</span> <span class="tag">${esc(o.category)}</span></span>
+        </div>
+        <div class="muted">${esc(o.organisation||'')} - deadline ${esc(o.deadline||'-')}${o.createdByUserId?' - researched by a user':''}</div>
+        ${src?`<div class="muted">Source: <a href="${esc(src)}" target="_blank" rel="noopener">${esc(src)}</a></div>`:''}
+        <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+          <button class="small" onclick='edit(${JSON.stringify(o).replace(/'/g,"&#39;")})'>Edit</button>
+          ${isResearch?`<button class="small" onclick="publishGlobally('${o.id}')">Publish globally</button>`:`<button class="small secondary" onclick="setStatus('${o.id}','published')">Publish</button>`}
+          <button class="small secondary" onclick="setStatus('${o.id}','review')">Review</button>
+          <button class="small secondary" onclick="setStatus('${o.id}','expired')">Expired</button>
+          <button class="small secondary" onclick="setStatus('${o.id}','suspicious')">Suspicious</button>
+          <button class="small danger" onclick="del('${o.id}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('') : '<p class="muted">No opportunities match this filter.</p>';
+}
+
+document.getElementById('f_category').innerHTML=opts(CATEGORIES);
+document.getElementById('f_status').innerHTML=opts(STATUSES);
+document.getElementById('f_riskLevel').innerHTML=opts(RISKS);
+document.getElementById('logoutBtn').onclick=logout;
+resetForm();
+if(TOKEN){ showApp(); loadOpps(); }
+</script>
+</body>
+</html>

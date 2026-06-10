@@ -1,0 +1,30 @@
+{
+  "name": "opendo-opportunity-tracker",
+  "version": "1.0.0",
+  "description": "AI-powered opportunity tracking and matching platform",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "create-admin": "node scripts/createAdmin.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.7.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "opportunity",
+    "tracker",
+    "platform"
+  ],
+  "author": "Opendo Team",
+  "license": "MIT"
+}

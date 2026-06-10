@@ -1,0 +1,71 @@
+const express = require('express');
+const router = express.Router();
+const { requireAuth } = require('../middleware/auth');
+const { readJsonArray, writeJsonArray } = require('../utils/jsonStore');
+const ActionStep = require('../models/ActionStep');
+
+const ACTION_STEPS_FILE = 'actionSteps.json';
+
+function loadSteps() {
+  return readJsonArray(ACTION_STEPS_FILE);
+}
+
+// GET /api/action-steps - all of the current user's action steps
+router.get('/', requireAuth, (req, res) => {
+  try {
+    const steps = loadSteps()
+      .filter(step => step.userId === req.user.id)
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+
+    res.json({ success: true, count: steps.length, data: steps });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching action steps', error: error.message });
+  }
+});
+
+// GET /api/action-steps/:opportunityId - the user's action steps for one opportunity
+router.get('/:opportunityId', requireAuth, (req, res) => {
+  try {
+    const steps = loadSteps().filter(
+      step => step.userId === req.user.id && step.opportunityId === req.params.opportunityId
+    );
+
+    res.json({ success: true, count: steps.length, data: steps });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error fetching action steps', error: error.message });
+  }
+});
+
+// PATCH /api/action-steps/:stepId/status - update one of the user's own steps
+router.patch('/:stepId/status', requireAuth, (req, res) => {
+  try {
+    const { status } = req.body || {};
+    if (!status) {
+      return res.status(400).json({ success: false, message: 'Status is required' });
+    }
+
+    const all = loadSteps();
+    const index = all.findIndex(step => step.id === req.params.stepId && step.userId === req.user.id);
+
+    if (index === -1) {
+      return res.status(404).json({ success: false, message: 'Action step not found' });
+    }
+
+    const step = new ActionStep(all[index]);
+    if (!step.updateStatus(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Status must be one of: ${ActionStep.getStatuses().join(', ')}`
+      });
+    }
+
+    all[index] = step.toObject();
+    writeJsonArray(ACTION_STEPS_FILE, all);
+
+    res.json({ success: true, message: 'Action step updated', data: all[index] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error updating action step', error: error.message });
+  }
+});
+
+module.exports = router;

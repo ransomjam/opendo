@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.env
+uploads/
+src/data/.jwt_secret
+src/data/*.json
