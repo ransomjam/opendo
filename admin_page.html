@@ -43,7 +43,7 @@
       <div><label>Password</label><input id="password" type="password" /></div>
       <div style="display:flex;align-items:flex-end"><button onclick="login()">Login</button></div>
     </div>
-    <p class="muted">Create an admin with <code>npm run create-admin</code> (see .env). A non-admin login will be rejected by admin-only endpoints.</p>
+    <p class="muted">On Render Free, set ADMIN_EMAIL and ADMIN_PASSWORD in Environment so the app creates the admin on startup. A non-admin login will be rejected by admin-only endpoints.</p>
     <p class="muted danger" id="authMsg"></p>
   </section>
 

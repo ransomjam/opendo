@@ -17,6 +17,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // Static HTML pages
 function sendPage(fileName) {
   return (req, res) => res.sendFile(path.join(__dirname, '..', fileName));

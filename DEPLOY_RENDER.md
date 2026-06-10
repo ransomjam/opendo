@@ -31,19 +31,18 @@ JWT_SECRET=<strong random secret>
 JWT_EXPIRES_IN=7d
 AUTO_SAVE_RESEARCH_RESULTS=true
 AUTO_MATCH_RESEARCH_RESULTS=true
+ADMIN_FULL_NAME=Admin User
+ADMIN_EMAIL=<your admin email>
+ADMIN_PASSWORD=<strong admin password>
 ```
 
 Do not set `PORT`; Render provides it.
 
 ## First Run
 
-For a demo, you can create the first admin from Render Shell:
+For a demo, set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in Render before deploying. On every startup, the app creates that admin user if missing, or promotes/resets that user if it already exists.
 
-```sh
-ADMIN_FULL_NAME="Admin User" ADMIN_EMAIL="admin@example.com" ADMIN_PASSWORD="replace-this" npm run create-admin
-```
-
-Because this is a free demo without persistent storage, the admin account can disappear after restart or redeploy. Re-run the command when needed.
+Because this is a free demo without persistent storage, the admin account can disappear after restart or redeploy. The startup bootstrap recreates it automatically as long as the admin env vars are still set.
 
 ## Smoke Checks
 
@@ -52,4 +51,5 @@ After deploy:
 - Open `/api/health` and expect `200`.
 - Open `/api/assistant/status` and confirm `providers` only contains `gemini`.
 - Open `/` and confirm the dashboard loads.
-- Register or create an admin account, sign in, and try a profile update.
+- Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+- Try `/api/documents` only after logging in; unauthenticated requests should return `401`, not static-host `404`.
