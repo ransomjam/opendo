@@ -53,3 +53,9 @@ After deploy:
 - Open `/` and confirm the dashboard loads.
 - Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 - Try `/api/documents` only after logging in; unauthenticated requests should return `401`, not static-host `404`.
+
+## Common Free-Tier Issues
+
+- `401` on `/api/profile`, `/api/documents`, `/api/dashboard/summary`, or `/api/matches`: log out and log back in. On Render Free, restarts can reset local JSON users while your browser still has an old token.
+- `401` on `/api/auth/login`: confirm `ADMIN_EMAIL` and `ADMIN_PASSWORD` are set in Render Environment, then redeploy.
+- `Gemini research failed`: confirm `GEMINI_API_KEY`, `GEMINI_RESEARCH_MODEL`, and `GEMINI_WRITING_MODEL` are set in Render Environment. Check Render logs for the exact Gemini error.

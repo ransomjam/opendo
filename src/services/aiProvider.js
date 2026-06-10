@@ -91,6 +91,25 @@ function extractGeminiCitations(response) {
   return citations;
 }
 
+function geminiErrorMessage(error, kind) {
+  const raw = String(error && (error.message || error.statusText || error) || '').trim();
+  const lower = raw.toLowerCase();
+
+  if (lower.includes('api key') || lower.includes('apikey') || lower.includes('permission') || lower.includes('unauthorized') || lower.includes('forbidden')) {
+    return `Gemini ${kind} failed. Check GEMINI_API_KEY in Render Environment and redeploy.`;
+  }
+  if (lower.includes('quota') || lower.includes('rate') || lower.includes('429')) {
+    return `Gemini ${kind} failed because the API quota or rate limit was reached.`;
+  }
+  if (lower.includes('model') || lower.includes('not found') || lower.includes('404')) {
+    return `Gemini ${kind} failed. Check GEMINI_RESEARCH_MODEL and GEMINI_WRITING_MODEL in Render Environment.`;
+  }
+  if (raw) {
+    return `Gemini ${kind} failed: ${raw.slice(0, 240)}`;
+  }
+  return `Gemini ${kind} failed. Check the Render logs for the Gemini error.`;
+}
+
 async function geminiGenerate({ prompt, useSearch, jsonMode }) {
   const ai = getGemini();
   if (!ai) return null;
@@ -120,10 +139,11 @@ async function research(prompt) {
   try {
     const result = await geminiGenerate({ prompt, useSearch: true });
     if (result && result.text) return { provider: 'gemini', ...result };
-  } catch (_) {
-    // return a clear error below
+  } catch (error) {
+    console.error('[aiProvider] Gemini research failed:', error && (error.stack || error.message || error));
+    return { error: geminiErrorMessage(error, 'research') };
   }
-  return { error: 'Gemini research failed or returned no content.' };
+  return { error: 'Gemini research returned no content. Check the Render logs and Gemini model settings.' };
 }
 
 async function write(prompt, { expectJson = true } = {}) {
@@ -134,8 +154,8 @@ async function write(prompt, { expectJson = true } = {}) {
     if (result && result.text) {
       return expectJson ? parseJsonLoose(result.text) : result.text;
     }
-  } catch (_) {
-    // null tells callers to keep their non-AI fallback behavior.
+  } catch (error) {
+    console.error('[aiProvider] Gemini writing failed:', error && (error.stack || error.message || error));
   }
   return null;
 }

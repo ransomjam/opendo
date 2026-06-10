@@ -229,7 +229,10 @@ async function api(path, opts={}){
   let body=null; try{ body=await res.json(); }catch(e){}
   // A 401 while we hold a token means the session is no longer valid (e.g. the
   // server restarted with a different JWT secret). Force a clean re-login.
-  if(res.status===401 && TOKEN){ sessionExpired(); throw new Error('Session expired - please log in again.'); }
+  if(res.status===401 && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/register')){
+    sessionExpired();
+    throw new Error('Session expired - please log in again.');
+  }
   if(!res.ok){
     const msg=(body&&(body.errors&&body.errors.length > 0 ? body.errors.join('; ') : body.message))||('HTTP '+res.status);
     throw new Error(msg);
@@ -237,15 +240,18 @@ async function api(path, opts={}){
   return body;
 }
 let _sessionExpiredShown=false;
-function sessionExpired(){
-  if(_sessionExpiredShown) return; _sessionExpiredShown=true;
+function clearSession(message){
   TOKEN=''; USER=null;
   localStorage.removeItem('opendo_token'); localStorage.removeItem('opendo_user');
   const app=document.getElementById('app'); if(app) app.classList.add('hidden');
   const auth=document.getElementById('authCard'); if(auth) auth.classList.remove('hidden');
   const lo=document.getElementById('logoutBtn'); if(lo) lo.classList.add('hidden');
   const who=document.getElementById('whoami'); if(who) who.textContent='Not signed in';
-  const m=document.getElementById('authMsg'); if(m) m.textContent='Your session expired. Please log in again.';
+  const m=document.getElementById('authMsg'); if(m) m.textContent=message||'';
+}
+function sessionExpired(){
+  if(_sessionExpiredShown) return; _sessionExpiredShown=true;
+  clearSession('Your session expired. Please log in again.');
 }
 function jsonPost(path, data, method='POST'){
   return api(path,{method,headers:headers({'Content-Type':'application/json'}),body:JSON.stringify(data)});
@@ -256,6 +262,7 @@ function authExtractUser(body){ return body.user || (body.data&&body.data.user) 
 
 async function doRegister(){
   const fullName=val('authName'), email=val('authEmail'), password=val('authPassword');
+  clearSession('');
   try{
     const body=await jsonPost('/api/auth/register',{fullName,email,password});
     afterAuth(body, email);
@@ -263,6 +270,7 @@ async function doRegister(){
 }
 async function doLogin(){
   const email=val('authEmail'), password=val('authPassword');
+  clearSession('');
   try{
     const body=await jsonPost('/api/auth/login',{email,password});
     afterAuth(body, email);
@@ -271,6 +279,7 @@ async function doLogin(){
 function afterAuth(body, email){
   TOKEN=authExtractToken(body);
   if(!TOKEN){ document.getElementById('authMsg').textContent='No token returned by server. Check the auth response shape.'; return; }
+  _sessionExpiredShown=false;
   USER=authExtractUser(body)||{email};
   localStorage.setItem('opendo_token',TOKEN);
   localStorage.setItem('opendo_user',JSON.stringify(USER));
@@ -531,10 +540,21 @@ async function updateProfileFromText(){
 
 async function loadAll(){ await loadOpps(); await Promise.all([loadAIStatus(),loadProfile(),loadDocuments(),loadSummary(),loadMatches()]); }
 
+async function boot(){
+  fillDocTypes();
+  renderExamples();
+  if(!TOKEN) return;
+  try{
+    await api('/api/auth/me',{headers:headers()});
+    showApp();
+    await loadAll();
+  }catch(e){
+    sessionExpired();
+  }
+}
+
 document.getElementById('logoutBtn').onclick=logout;
-fillDocTypes();
-renderExamples();
-if(TOKEN){ showApp(); loadAll(); }
+boot();
 </script>
 </body>
 </html>
