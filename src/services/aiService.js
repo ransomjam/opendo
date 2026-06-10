@@ -28,6 +28,8 @@ function buildPrompt(match, profile, opportunity) {
     `Opp: ${JSON.stringify({
       title: opportunity.title,
       category: opportunity.category,
+      deliveryMode: opportunity.deliveryMode,
+      location: opportunity.location,
       eligibility: truncate(opportunity.eligibility),
       benefits: truncate(opportunity.benefits),
       deadline: opportunity.deadline

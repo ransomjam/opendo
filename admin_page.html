@@ -57,6 +57,7 @@
       </div>
       <div class="row">
         <div><label>Category *</label><select id="f_category"></select></div>
+        <div><label>Delivery mode</label><select id="f_deliveryMode"></select></div>
         <div><label>Deadline * (YYYY-MM-DD)</label><input id="f_deadline" placeholder="2026-09-30" /></div>
         <div><label>Status</label><select id="f_status"></select></div>
       </div>
@@ -104,7 +105,8 @@
 <div id="toast"></div>
 
 <script>
-const CATEGORIES=['grant','funding','exhibition','networking','fellowship','training','competition','tender','scholarship','startup_programme','other'];
+const CATEGORIES=['grant','funding','exhibition','networking','fellowship','training','competition','tender','scholarship','internship','volunteering','startup_programme','other'];
+const DELIVERY_MODES=['','physical','remote','hybrid','general'];
 const STATUSES=['draft','review','published','personal_research','closed','expired','suspicious'];
 const RISKS=['low','medium','high','unverified'];
 let TOKEN=localStorage.getItem('opendo_admin_token')||'';
@@ -116,6 +118,8 @@ function jpost(path,data,method='POST'){return api(path,{method,headers:headers(
 function val(id){return document.getElementById(id).value.trim();}
 function setVal(id,v){document.getElementById(id).value=v==null?'':v;}
 function opts(arr){return arr.map(x=>`<option value="${x}">${x}</option>`).join('');}
+function labelFor(value){return value ? value.replace(/_/g,' ') : 'unspecified';}
+function labeledOpts(arr){return arr.map(x=>`<option value="${x}">${labelFor(x)}</option>`).join('');}
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 
 async function login(){
@@ -133,6 +137,7 @@ function showApp(){document.getElementById('authCard').classList.add('hidden');d
 function resetForm(){
   ['f_id','f_title','f_organisation','f_deadline','f_countryScope','f_location','f_fundingAmount','f_applicationLink','f_description','f_eligibility','f_requiredDocuments','f_benefits','f_applicationSteps'].forEach(i=>setVal(i,''));
   document.getElementById('f_category').value='grant';
+  document.getElementById('f_deliveryMode').value='';
   document.getElementById('f_status').value='draft';
   document.getElementById('f_riskLevel').value='unverified';
   document.getElementById('formTitle').textContent='Create opportunity';
@@ -141,7 +146,7 @@ function resetForm(){
 function collect(){
   return {
     title:val('f_title'),organisation:val('f_organisation'),category:val('f_category'),
-    deadline:val('f_deadline'),status:val('f_status'),countryScope:val('f_countryScope'),
+    deliveryMode:val('f_deliveryMode'),deadline:val('f_deadline'),status:val('f_status'),countryScope:val('f_countryScope'),
     location:val('f_location'),riskLevel:val('f_riskLevel'),fundingAmount:val('f_fundingAmount'),
     applicationLink:val('f_applicationLink'),description:val('f_description'),eligibility:val('f_eligibility'),
     requiredDocuments:val('f_requiredDocuments'),benefits:val('f_benefits'),applicationSteps:val('f_applicationSteps')
@@ -158,6 +163,7 @@ async function saveOpp(){
 function edit(o){
   setVal('f_id',o.id);setVal('f_title',o.title);setVal('f_organisation',o.organisation);
   document.getElementById('f_category').value=o.category||'grant';
+  document.getElementById('f_deliveryMode').value=o.deliveryMode||'';
   setVal('f_deadline',o.deadline);document.getElementById('f_status').value=o.status||'draft';
   setVal('f_countryScope',o.countryScope);setVal('f_location',o.location);
   document.getElementById('f_riskLevel').value=o.riskLevel||'unverified';
@@ -190,7 +196,7 @@ function renderOpps(){
       <div class="opp">
         <div class="flex-between">
           <strong>${esc(o.title)}</strong>
-          <span><span class="tag">${esc(o.status)}</span> <span class="tag">${esc(o.visibility||'public')}</span> <span class="tag">${esc(o.category)}</span></span>
+          <span><span class="tag">${esc(o.status)}</span> <span class="tag">${esc(o.visibility||'public')}</span> <span class="tag">${esc(o.category)}</span>${o.deliveryMode?` <span class="tag">${esc(labelFor(o.deliveryMode))}</span>`:''}</span>
         </div>
         <div class="muted">${esc(o.organisation||'')} - deadline ${esc(o.deadline||'-')}${o.createdByUserId?' - researched by a user':''}</div>
         ${src?`<div class="muted">Source: <a href="${esc(src)}" target="_blank" rel="noopener">${esc(src)}</a></div>`:''}
@@ -207,6 +213,7 @@ function renderOpps(){
 }
 
 document.getElementById('f_category').innerHTML=opts(CATEGORIES);
+document.getElementById('f_deliveryMode').innerHTML=labeledOpts(DELIVERY_MODES);
 document.getElementById('f_status').innerHTML=opts(STATUSES);
 document.getElementById('f_riskLevel').innerHTML=opts(RISKS);
 document.getElementById('logoutBtn').onclick=logout;

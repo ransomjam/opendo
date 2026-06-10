@@ -8,8 +8,17 @@ const ALLOWED_CATEGORIES = [
   'competition',
   'tender',
   'scholarship',
+  'internship',
+  'volunteering',
   'startup_programme',
   'other'
+];
+
+const ALLOWED_DELIVERY_MODES = [
+  'physical',
+  'remote',
+  'hybrid',
+  'general'
 ];
 
 const ALLOWED_RISK_LEVELS = [
@@ -54,6 +63,7 @@ class Opportunity {
     this.description = data.description ?? '';
     this.countryScope = data.countryScope ?? '';
     this.location = data.location ?? '';
+    this.deliveryMode = ALLOWED_DELIVERY_MODES.includes(data.deliveryMode) ? data.deliveryMode : '';
     // Deadline may legitimately be unknown for AI-researched opportunities — we
     // never invent one, so null is preserved rather than coerced to a string.
     this.deadline = data.deadline === undefined ? null : data.deadline;
@@ -88,6 +98,10 @@ class Opportunity {
     return ALLOWED_RISK_LEVELS;
   }
 
+  static getDeliveryModes() {
+    return ALLOWED_DELIVERY_MODES;
+  }
+
   static getStatuses() {
     return ALLOWED_STATUSES;
   }
@@ -115,6 +129,10 @@ class Opportunity {
 
     if (!Opportunity.isBlank(this.riskLevel) && !Opportunity.getRiskLevels().includes(this.riskLevel)) {
       errors.push('Risk level must be one of the allowed values');
+    }
+
+    if (!Opportunity.isBlank(this.deliveryMode) && !Opportunity.getDeliveryModes().includes(this.deliveryMode)) {
+      errors.push('Delivery mode must be one of the allowed values');
     }
 
     if (!Opportunity.isBlank(this.status) && !Opportunity.getStatuses().includes(this.status)) {
@@ -180,6 +198,7 @@ class Opportunity {
       description: this.description,
       countryScope: this.countryScope,
       location: this.location,
+      deliveryMode: this.deliveryMode,
       deadline: this.deadline,
       fundingAmount: this.fundingAmount,
       benefits: this.benefits,

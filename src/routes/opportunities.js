@@ -64,6 +64,10 @@ router.get('/', optionalAuth, async (req, res) => {
       errors.push('Risk level must be one of the allowed values');
     }
 
+    if (req.query.deliveryMode && !Opportunity.getDeliveryModes().includes(req.query.deliveryMode)) {
+      errors.push('Delivery mode must be one of the allowed values');
+    }
+
     if (req.query.deadlineBefore && !isValidDateFilter(req.query.deadlineBefore)) {
       errors.push('Deadline before must be a valid date');
     }
@@ -101,12 +105,21 @@ router.get('/', optionalAuth, async (req, res) => {
       filteredOpportunities = filteredOpportunities.filter(opp => opp.riskLevel === req.query.riskLevel);
     }
 
+    if (req.query.deliveryMode) {
+      filteredOpportunities = filteredOpportunities.filter(opp => opp.deliveryMode === req.query.deliveryMode);
+    }
+
     if (req.query.country) {
       const country = req.query.country.toLowerCase();
       filteredOpportunities = filteredOpportunities.filter(opp =>
         contains(opp.countryScope, country) ||
         contains(opp.location, country)
       );
+    }
+
+    if (req.query.location) {
+      const location = req.query.location.toLowerCase();
+      filteredOpportunities = filteredOpportunities.filter(opp => contains(opp.location, location));
     }
 
     if (req.query.search) {

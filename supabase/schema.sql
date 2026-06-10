@@ -44,6 +44,7 @@ create table if not exists public.opportunities (
   description text not null default '',
   country_scope text not null default '',
   location text not null default '',
+  delivery_mode text not null default '',
   deadline text,
   funding_amount text not null default '',
   benefits text not null default '',
@@ -128,6 +129,7 @@ create table if not exists public.application_notes (
 alter table public.action_steps add column if not exists due_date text;
 alter table public.action_steps add column if not exists notes text not null default '';
 alter table public.action_steps add column if not exists completed_at timestamptz;
+alter table public.opportunities add column if not exists delivery_mode text not null default '';
 
 create index if not exists users_email_idx on public.users (email);
 create index if not exists user_profiles_user_id_idx on public.user_profiles (user_id);
@@ -135,6 +137,7 @@ create index if not exists opportunities_status_idx on public.opportunities (sta
 create index if not exists opportunities_visibility_idx on public.opportunities (visibility);
 create index if not exists opportunities_created_by_user_id_idx on public.opportunities (created_by_user_id);
 create index if not exists opportunities_category_idx on public.opportunities (category);
+create index if not exists opportunities_delivery_mode_idx on public.opportunities (delivery_mode);
 create index if not exists user_documents_user_id_idx on public.user_documents (user_id);
 create index if not exists user_opportunity_matches_user_id_idx on public.user_opportunity_matches (user_id);
 create index if not exists user_opportunity_matches_opportunity_id_idx on public.user_opportunity_matches (opportunity_id);

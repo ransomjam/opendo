@@ -147,7 +147,7 @@
       <div style="background:#f9fafb; border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:12px">
         <strong style="font-size:14px">Tell Opendo about yourself</strong>
         <p class="muted" style="margin:4px 0">Paste a few lines about yourself and AI will fill in your profile below (preferred). The manual form still works as a backup.</p>
-        <textarea id="profileHelperInput" rows="2" placeholder="I am a founder in Cameroon working in education technology. I need funding and networking. I have a CV and passport, but no pitch deck."></textarea>
+        <textarea id="profileHelperInput" rows="2" placeholder="I am a founder in Cameroon working in education technology. I need funding, internships, volunteering and scholarships. I have a CV and passport, but no pitch deck."></textarea>
         <div style="margin-top:8px"><button class="small" onclick="updateProfileFromText()">Update my profile with AI</button></div>
         <p class="muted" id="profileHelperMsg"></p>
       </div>
@@ -167,7 +167,7 @@
         <div><label>Sector interests (comma separated)</label><input id="p_sectorInterests" /></div>
       </div>
       <div class="row">
-        <div><label>Preferred opportunity types (comma separated)</label><input id="p_preferredOpportunityTypes" placeholder="grant, fellowship" /></div>
+        <div><label>Preferred opportunity types (comma separated)</label><input id="p_preferredOpportunityTypes" placeholder="grant, internship, volunteering, scholarship" /></div>
         <div><label>Portfolio links (comma separated)</label><input id="p_portfolioLinks" /></div>
       </div>
       <label>Bio</label>
@@ -461,7 +461,7 @@ function renderWorkspaceItem(item, index){
     <div class="flex-between">
       <div>
         <h3>${esc(o.title||'(opportunity)')}</h3>
-        <div class="muted">${esc(o.organisation||'')}${o.deadline?(' - deadline '+esc(o.deadline)):''}${deadlineText?(' - '+esc(deadlineText)):''}</div>
+        <div class="muted">${esc(o.organisation||'')}${o.deliveryMode?(' - '+esc(labelFor(o.deliveryMode))):''}${o.location?(' - '+esc(o.location)):''}${o.deadline?(' - deadline '+esc(o.deadline)):''}${deadlineText?(' - '+esc(deadlineText)):''}</div>
       </div>
       <div style="text-align:right">
         <div class="score">${m.matchScore}</div>
@@ -566,7 +566,7 @@ function renderMatches(){
           <span class="badge ${m.matchLevel}">${m.matchLevel.replace('_',' ')}</span>
         </div>
       </div>
-      <div class="muted">${esc(o.organisation||'')} ${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
+      <div class="muted">${esc(o.organisation||'')}${o.deliveryMode?(' - '+esc(labelFor(o.deliveryMode))):''}${o.location?(' - '+esc(o.location)):''}${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
       <div style="margin:6px 0"><span class="tag">Eligibility: ${m.eligibilityStatus.replace('_',' ')}</span>
         <span class="tag">Status: ${m.status}</span> ${m.aiEnhanced?'<span class="tag">AI</span>':''}</div>
       <div class="row">
@@ -592,13 +592,17 @@ async function setStatus(matchId,status){
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 function escAttr(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function labelFor(value){ return String(value||'').replace(/_/g,' '); }
 
 // ---- Ask Opendo AI ----
 const EXAMPLES=[
   {label:'Find grants for my business', text:'Find grants for my business', mode:'research'},
+  {label:'Find remote internships', text:'Find remote internships related to my profile', mode:'research'},
+  {label:'Find volunteering roles', text:'Find volunteering opportunities I can do remotely or near my location', mode:'research'},
+  {label:'Find scholarships', text:'Find scholarship opportunities that fit my education level and country', mode:'research'},
   {label:'Find exhibitions near me', text:'Find exhibitions and trade fairs relevant to my business and location', mode:'research'},
   {label:'Find startup funding in Africa', text:'Find startup funding opportunities in Africa for an early-stage tech company', mode:'research'},
-  {label:'Update my profile from this text', text:'I am a tech founder in Cameroon. I run a small software business and I am looking for grants, startup funding, exhibitions, and networking. I have a CV but no pitch deck yet.', mode:'profile'},
+  {label:'Update my profile from this text', text:'I am a tech founder in Cameroon. I run a small software business and I am looking for grants, internships, volunteering, scholarships, exhibitions, and networking. I have a CV but no pitch deck yet.', mode:'profile'},
   {label:'What should I do today?', text:'What should I do today?', mode:'action_plan'},
   {label:'What opportunities fit me best?', text:'What opportunities fit me best?', mode:'matching'}
 ];
@@ -659,7 +663,7 @@ function renderOppCard(o){
       <h3>${esc(o.title||'(opportunity)')}</h3>
       <div style="text-align:right">${score!==''?`<div class="score">${score}</div>`:''}${level?`<span class="badge ${level}">${esc(level.replace(/_/g,' '))}</span>`:''}</div>
     </div>
-    <div class="muted">${esc(o.organisation||'')}${o.category?(' - '+esc(o.category)):''}${o.location?(' - '+esc(o.location)):''}${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
+    <div class="muted">${esc(o.organisation||'')}${o.category?(' - '+esc(o.category)):''}${o.deliveryMode?(' - '+esc(labelFor(o.deliveryMode))):''}${o.location?(' - '+esc(o.location)):''}${o.deadline?(' - deadline '+esc(o.deadline)):''}</div>
     <div style="margin:6px 0"><strong>Missing documents:</strong> ${missing}</div>
     ${steps?`<div><strong>Do next</strong><ul>${steps}</ul></div>`:''}
     <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">

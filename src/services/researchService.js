@@ -57,6 +57,13 @@ const CATEGORY_SYNONYMS = {
   tender: 'tender',
   procurement: 'tender',
   scholarship: 'scholarship',
+  scholarships: 'scholarship',
+  internship: 'internship',
+  internships: 'internship',
+  intern: 'internship',
+  volunteering: 'volunteering',
+  volunteer: 'volunteering',
+  volunteerism: 'volunteering',
   startup_programme: 'startup_programme',
   'startup program': 'startup_programme',
   accelerator: 'startup_programme',
@@ -73,6 +80,27 @@ function normaliseCategory(value) {
   // try loose contains match
   const hit = Object.keys(CATEGORY_SYNONYMS).find(k => key.includes(k));
   return hit ? CATEGORY_SYNONYMS[hit] : 'other';
+}
+
+function normaliseDeliveryMode(value, raw = {}) {
+  const explicit = String(value || '').trim().toLowerCase();
+  if (Opportunity.getDeliveryModes().includes(explicit)) return explicit;
+
+  const text = [
+    value,
+    raw.deliveryMode,
+    raw.locationMode,
+    raw.location,
+    raw.countryScope,
+    raw.description,
+    raw.eligibility
+  ].map(item => String(item || '').toLowerCase()).join(' ');
+
+  if (/\b(remote|online|virtual)\b/.test(text)) return 'remote';
+  if (/\bhybrid\b/.test(text)) return 'hybrid';
+  if (/\b(in[- ]person|onsite|on-site|physical|on campus|campus-based)\b/.test(text)) return 'physical';
+  if (/\b(global|worldwide|international|anywhere|open to all)\b/.test(text)) return 'general';
+  return '';
 }
 
 function cleanUrl(value) {
@@ -106,8 +134,8 @@ function buildResearchPrompt(query, limit) {
   const safeQuery = trimForPrompt(query, MAX_RESEARCH_QUERY_CHARS);
   return [
     `Find up to ${limit} real, current opportunities matching the request. Use web search.`,
-    'Rules: sourceUrl is required; prefer official pages; do not invent deadlines or links; use null/"" when unknown; keep text concise.',
-    'Return JSON only: {"opportunities":[{"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,startup_programme,other","description":"1-2 short sentences","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":""}]}',
+    'Rules: include internships, volunteering and scholarships when requested; sourceUrl is required; prefer official pages; do not invent deadlines or links; use null/"" when unknown; keep text concise.',
+    'Return JSON only: {"opportunities":[{"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,internship,volunteering,startup_programme,other","deliveryMode":"one of physical,remote,hybrid,general or empty if unknown","description":"1-2 short sentences","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":""}]}',
     `Request: ${safeQuery}`
   ].join('\n');
 }
@@ -116,7 +144,7 @@ function buildExtractionPrompt(text) {
   const safeText = trimForPrompt(text, MAX_PASTED_OPPORTUNITY_CHARS);
   return [
     'Extract one opportunity. Do not invent missing deadlines or links; only use URLs present in the text.',
-    'Return JSON only: {"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,startup_programme,other","description":"","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":null}',
+    'Return JSON only: {"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,internship,volunteering,startup_programme,other","deliveryMode":"one of physical,remote,hybrid,general or empty if unknown","description":"","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":null}',
     `Text: ${safeText}`
   ].join('\n');
 }
@@ -151,7 +179,7 @@ function enrichExisting(existing, candidate) {
   const fillable = [
     'description', 'countryScope', 'location', 'deadline', 'fundingAmount',
     'benefits', 'eligibility', 'requiredDocuments', 'applicationSteps',
-    'applicationLink', 'sourceUrl'
+    'applicationLink', 'sourceUrl', 'deliveryMode'
   ];
   fillable.forEach(field => {
     const current = existing[field];
@@ -187,6 +215,7 @@ function normaliseCandidate(raw, { requireLink }) {
     title: asText(raw.title),
     organisation: asText(raw.organisation),
     category: normaliseCategory(raw.category),
+    deliveryMode: normaliseDeliveryMode(raw.deliveryMode || raw.locationMode, raw),
     description: asText(raw.description),
     countryScope: asText(raw.countryScope),
     location: asText(raw.location),

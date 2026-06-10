@@ -59,7 +59,7 @@ function detectIntent(message) {
 
   // Research: find/search verbs combined with opportunity nouns
   const findVerb = has(text, 'find', 'search', 'look for', 'looking for', 'show me', 'get me', 'discover', 'list', 'recommend');
-  const oppNoun = has(text, 'grant', 'fund', 'opportunit', 'exhibition', 'expo', 'networking', 'fellowship', 'scholarship', 'competition', 'accelerator', 'incubator', 'training', 'tender', 'event', 'programme', 'program');
+  const oppNoun = has(text, 'grant', 'fund', 'opportunit', 'exhibition', 'expo', 'networking', 'fellowship', 'scholarship', 'internship', 'intern ', 'volunteer', 'volunteering', 'competition', 'accelerator', 'incubator', 'training', 'tender', 'event', 'programme', 'program');
   if (findVerb && oppNoun) {
     return 'research_opportunities';
   }
@@ -130,7 +130,7 @@ async function buildTodayPlan(userId) {
   if (!active.length) {
     return {
       hasPlan: false,
-      message: 'You have no active matches yet. Tell me what you are looking for (e.g. "find grants for my tech startup in Cameroon") and I will research opportunities for you.'
+      message: 'You have no active matches yet. Tell me what you are looking for (e.g. "find remote internships, volunteering roles or scholarships for me") and I will research opportunities for you.'
     };
   }
 
@@ -232,6 +232,7 @@ async function answerGeneral(message) {
   return [
     'I can help you find and organise opportunities. Try one of these:',
     '- "Find grants for my tech startup in Cameroon" (I research real opportunities)',
+    '- "Find remote internships, volunteering roles or scholarships for me"',
     '- Paste a few lines about yourself to update your profile',
     '- Paste an opportunity announcement to save it',
     '- Ask "What opportunities fit me best?" or "What should I do today?"'
@@ -288,7 +289,7 @@ async function chat({ userId, message, mode }) {
       const top = matches[0];
       const message = matches.length
         ? `You have ${matches.length} match${matches.length === 1 ? '' : 'es'}.${top ? ` Your best fit is "${top.title}" (${top.match.matchScore}%).` : ''}`
-        : 'You have no matches yet. Try "find grants for my business" so I can research opportunities, or complete your profile.';
+        : 'You have no matches yet. Try "find scholarships, internships or volunteering opportunities for me" so I can research opportunities, or complete your profile.';
       return { ...base, message, opportunities: matches };
     }
 
@@ -305,7 +306,7 @@ async function chat({ userId, message, mode }) {
     default:
       return {
         ...base,
-        message: 'I\'m not sure what you need. You can: research opportunities ("find grants for my startup"), update your profile (describe yourself), paste an opportunity to save it, ask "what fits me best?", or ask "what should I do today?".'
+        message: 'I\'m not sure what you need. You can: research opportunities ("find remote internships", "find scholarships", "find volunteering opportunities"), update your profile (describe yourself), paste an opportunity to save it, ask "what fits me best?", or ask "what should I do today?".'
       };
   }
 }

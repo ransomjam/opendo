@@ -101,6 +101,7 @@ function scoreEligibility(profile, opportunity) {
   const concerns = [];
   const eligibilityText = lower(opportunity.eligibility);
   const scopeText = `${lower(opportunity.countryScope)} ${lower(opportunity.location)}`;
+  const deliveryMode = lower(opportunity.deliveryMode);
   let score = 60; // neutral starting point — we are deliberately cautious
 
   if (!profile) {
@@ -114,10 +115,18 @@ function scoreEligibility(profile, opportunity) {
 
   const country = lower(profile.country);
 
+  if (deliveryMode === 'remote') {
+    score += 10;
+    reasons.push('This opportunity is remote, so location is less likely to block you.');
+  } else if (deliveryMode === 'general' || scopeText.includes('global') || scopeText.includes('international') || scopeText.includes('worldwide')) {
+    score += 10;
+    reasons.push('This opportunity appears to be generally or internationally open.');
+  }
+
   if (country && (eligibilityText.includes(country) || scopeText.includes(country))) {
     score += 20;
     reasons.push('Your country appears to match the eligibility or scope of this opportunity.');
-  } else if (country && (scopeText.includes('global') || scopeText.includes('international') || scopeText.includes('worldwide') || (!opportunity.countryScope && !opportunity.location))) {
+  } else if (country && (deliveryMode === 'remote' || deliveryMode === 'general' || scopeText.includes('global') || scopeText.includes('international') || scopeText.includes('worldwide') || (!opportunity.countryScope && !opportunity.location))) {
     score += 10;
     reasons.push('This opportunity appears to be open internationally.');
   } else if (country && opportunity.countryScope) {
@@ -135,7 +144,7 @@ function scoreEligibility(profile, opportunity) {
     }
   }
 
-  if ((eligibilityText.includes('travel') || eligibilityText.includes('in person') || eligibilityText.includes('in-person')) && !profile.travelAvailable) {
+  if ((deliveryMode === 'physical' || eligibilityText.includes('travel') || eligibilityText.includes('in person') || eligibilityText.includes('in-person')) && !profile.travelAvailable) {
     score -= 5;
     concerns.push('Travel or in-person attendance may be required.');
   }

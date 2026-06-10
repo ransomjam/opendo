@@ -31,7 +31,7 @@ function buildPrompt(text) {
   return [
     'Extract only clearly stated profile data. Do not guess. Return JSON only; omit unknown fields.',
     'Fields: country, city, profession, educationLevel, skills[], businessType, businessStage, sectorInterests[], fundingNeeds, travelAvailable, passportAvailable, businessRegistered, preferredOpportunityTypes[], bio, portfolioLinks[].',
-    'preferredOpportunityTypes values: grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, startup_programme.',
+    'preferredOpportunityTypes values: grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, internship, volunteering, startup_programme.',
     `Message: ${safeText}`
   ].join('\n');
 }
