@@ -1,21 +1,21 @@
-# Deploying Opendo on Render
+# Deploying Opendo on Render Free
 
-Opendo deploys as one Render Web Service: Express serves both the static HTML pages and the API.
+Opendo can run on Render's free Web Service tier as a demo. Free web services do not support persistent disks, so local JSON data and uploaded documents can reset after restart or redeploy.
 
-## Render Service
+## Create the Service
 
-Use the included `render.yaml` blueprint or create the service manually with these settings:
+Create the service manually instead of using a Render Blueprint.
 
-- Service type: Web Service
-- Runtime: Node
-- Plan: paid plan with a persistent disk
+- Render menu: **New +** -> **Web Service**
+- Repository: `ransomjam/opendo`
+- Branch: `main`
+- Runtime: `Node`
+- Plan: `Free`
 - Build command: `npm ci`
 - Start command: `npm start`
 - Health check path: `/api/health`
-- Disk mount path: `/var/data/opendo`
-- Initial disk size: `1 GB`
 
-Render's non-disk filesystem is ephemeral. Keep `DATA_DIR` and `UPLOADS_DIR` under the mounted disk path.
+Do not add a disk. Do not set `DATA_DIR` or `UPLOADS_DIR` for the free demo.
 
 ## Environment Variables
 
@@ -29,8 +29,6 @@ GEMINI_RESEARCH_MODEL=gemini-2.5-flash
 GEMINI_WRITING_MODEL=gemini-2.5-flash
 JWT_SECRET=<strong random secret>
 JWT_EXPIRES_IN=7d
-DATA_DIR=/var/data/opendo/data
-UPLOADS_DIR=/var/data/opendo/uploads
 AUTO_SAVE_RESEARCH_RESULTS=true
 AUTO_MATCH_RESEARCH_RESULTS=true
 ```
@@ -39,15 +37,13 @@ Do not set `PORT`; Render provides it.
 
 ## First Run
 
-Start production with a clean slate. The app creates empty JSON files under `DATA_DIR` as each feature is used.
-
-Create the first admin from Render Shell or a one-off job:
+For a demo, you can create the first admin from Render Shell:
 
 ```sh
 ADMIN_FULL_NAME="Admin User" ADMIN_EMAIL="admin@example.com" ADMIN_PASSWORD="replace-this" npm run create-admin
 ```
 
-Use a strong temporary password, sign in, then rotate it through your normal admin process.
+Because this is a free demo without persistent storage, the admin account can disappear after restart or redeploy. Re-run the command when needed.
 
 ## Smoke Checks
 
@@ -55,5 +51,5 @@ After deploy:
 
 - Open `/api/health` and expect `200`.
 - Open `/api/assistant/status` and confirm `providers` only contains `gemini`.
-- Register or create the admin user, sign in, create a profile, upload a document, delete it, and recalculate matches.
-- Redeploy or restart the service and confirm the user/profile JSON data remains under the persistent disk.
+- Open `/` and confirm the dashboard loads.
+- Register or create an admin account, sign in, and try a profile update.
