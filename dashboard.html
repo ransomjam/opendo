@@ -386,7 +386,7 @@ async function loadSummary(){
   }catch(e){ document.getElementById('summaryGrid').innerHTML='<p class="muted">Summary unavailable: '+e.message+'</p>'; }
 }
 async function loadOpps(){
-  try{ const body=await api('/api/opportunities?status=published',{headers:headers()});
+  try{ const body=await api('/api/opportunities',{headers:headers()});
     (body.data||[]).forEach(o=>OPPS[o.id]=o);
   }catch(e){}
 }
@@ -409,11 +409,13 @@ function renderMatches(){
   if(!list.length){ msg.textContent='No matches yet. Add a published opportunity (admin), complete your profile, then Recalculate.'; document.getElementById('matchList').innerHTML=''; return; }
   msg.textContent='';
   document.getElementById('matchList').innerHTML=list.map(m=>{
-    const o=OPPS[m.opportunityId]||{};
+    const o=m.opportunity||OPPS[m.opportunityId]||{};
     const reasons=(m.matchReasons||[]).map(r=>`<li>${esc(r)}</li>`).join('');
     const concerns=(m.possibleConcerns||[]).map(r=>`<li class="danger">${esc(r)}</li>`).join('');
     const missing=(m.missingDocuments||[]).map(d=>`<span class="pill">${esc(d)}</span>`).join('')||'<span class="muted">none detected</span>';
     const steps=(m.recommendedNextSteps||[]).map(s=>`<li>${esc(s)}</li>`).join('');
+    const appLink=o.applicationLink||o.sourceUrl||'';
+    const srcLink=o.sourceUrl||'';
     return `<div class="opp">
       <div class="flex-between">
         <h3>${esc(o.title||'(opportunity)')}</h3>
@@ -431,6 +433,10 @@ function renderMatches(){
       </div>
       <div><strong>Missing documents:</strong> ${missing}</div>
       <div><strong>Next steps</strong><ul>${steps||'<li class="muted">No next steps yet</li>'}</ul></div>
+      <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+        ${appLink?`<a href="${escAttr(appLink)}" target="_blank" rel="noopener"><button class="small">Open Application Link</button></a>`:''}
+        ${srcLink?`<a href="${escAttr(srcLink)}" target="_blank" rel="noopener"><button class="small secondary">Open Source</button></a>`:''}
+      </div>
       <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
         ${['saved','interested','applying','submitted','ignored'].map(s=>`<button class="small ${m.status===s?'':'secondary'}" onclick="setStatus('${m.id}','${s}')">${s}</button>`).join('')}
       </div>

@@ -3,6 +3,25 @@ const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const matchingService = require('../services/matchingService');
 const UserOpportunityMatch = require('../models/UserOpportunityMatch');
+const Opportunity = require('../models/Opportunity');
+const { readJsonArray } = require('../utils/jsonStore');
+
+function loadOpportunityMap() {
+  const map = new Map();
+  readJsonArray('opportunities.json').forEach(data => {
+    const opportunity = new Opportunity(data);
+    map.set(opportunity.id, opportunity.toObject());
+  });
+  return map;
+}
+
+function attachOpportunities(matches) {
+  const opportunities = loadOpportunityMap();
+  return matches.map(match => ({
+    ...match,
+    opportunity: opportunities.get(match.opportunityId) || null
+  }));
+}
 
 // GET /api/matches - list the current user's matches (with optional filters)
 router.get('/', requireAuth, (req, res) => {
@@ -17,7 +36,7 @@ router.get('/', requireAuth, (req, res) => {
     res.json({
       success: true,
       count: matches.length,
-      data: matches
+      data: attachOpportunities(matches)
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching matches', error: error.message });
@@ -34,7 +53,7 @@ router.post('/recalculate', requireAuth, async (req, res) => {
       success: true,
       message: 'Matches recalculated',
       count: matches.length,
-      data: matches.sort((a, b) => b.matchScore - a.matchScore)
+      data: attachOpportunities(matches.sort((a, b) => b.matchScore - a.matchScore))
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error recalculating matches', error: error.message });
@@ -77,7 +96,7 @@ router.get('/:opportunityId', requireAuth, (req, res) => {
         message: 'No match found for this opportunity. Try recalculating matches.'
       });
     }
-    res.json({ success: true, data: match });
+    res.json({ success: true, data: attachOpportunities([match])[0] });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching match', error: error.message });
   }
