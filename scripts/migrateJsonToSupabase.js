@@ -7,8 +7,8 @@ require('../src/config/env');
 const fs = require('fs');
 const path = require('path');
 const { getDataDir } = require('../src/config/storage');
-const { writeJsonArray } = require('../src/utils/jsonStore');
 const { isSupabaseConfigured } = require('../src/config/supabase');
+const { upsertStructuredCollection } = require('../src/repositories/supabaseStructuredStore');
 
 const FILES = [
   'users.json',
@@ -38,7 +38,7 @@ async function main() {
     if (!Array.isArray(data)) {
       fail(`${fileName} must contain a JSON array.`);
     }
-    await writeJsonArray(fileName, data);
+    await upsertStructuredCollection(fileName, data);
     console.log(`[migrate-json-to-supabase] ${fileName}: ${data.length} record(s)`);
   }
 }

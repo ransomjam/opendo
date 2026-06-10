@@ -1,11 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { getDataDir } = require('../config/storage');
+const { isSupabaseConfigured } = require('../config/supabase');
 const {
-  getSupabaseClient,
-  getSupabaseJsonTable,
-  isSupabaseConfigured
-} = require('../config/supabase');
+  readStructuredCollection,
+  writeStructuredCollection
+} = require('../repositories/supabaseStructuredStore');
 
 function resolveDataPath(fileName) {
   return path.join(getDataDir(), fileName);
@@ -39,24 +39,7 @@ async function readJsonArray(fileName) {
     return readJsonArrayFromFile(fileName);
   }
 
-  const supabase = getSupabaseClient();
-  const table = getSupabaseJsonTable();
-  const { data, error } = await supabase
-    .from(table)
-    .select('data')
-    .eq('file_name', fileName)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(`Supabase read failed for ${fileName}: ${error.message}`);
-  }
-
-  if (!data) {
-    await writeJsonArray(fileName, []);
-    return [];
-  }
-
-  return Array.isArray(data.data) ? data.data : [];
+  return readStructuredCollection(fileName);
 }
 
 async function writeJsonArray(fileName, data) {
@@ -69,19 +52,7 @@ async function writeJsonArray(fileName, data) {
     return;
   }
 
-  const supabase = getSupabaseClient();
-  const table = getSupabaseJsonTable();
-  const { error } = await supabase
-    .from(table)
-    .upsert({
-      file_name: fileName,
-      data,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'file_name' });
-
-  if (error) {
-    throw new Error(`Supabase write failed for ${fileName}: ${error.message}`);
-  }
+  await writeStructuredCollection(fileName, data);
 }
 
 module.exports = {

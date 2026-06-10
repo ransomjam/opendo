@@ -36,9 +36,10 @@ ADMIN_EMAIL=<your admin email>
 ADMIN_PASSWORD=<strong admin password>
 SUPABASE_URL=<your Supabase project URL>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service_role key>
-SUPABASE_JSON_TABLE=opendo_json_store
 SUPABASE_STORAGE_BUCKET=opendo-documents
 ```
+
+Set `SUPABASE_JSON_TABLE=opendo_json_store` only if you are migrating existing data from the old JSON bridge table.
 
 Do not set `PORT`; Render provides it.
 
@@ -50,6 +51,8 @@ Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in Render before deploying. On every star
 
 If Supabase is not configured, Render Free stores data on temporary local disk and it can disappear after restart or redeploy.
 
+If you already used the old `opendo_json_store` table, run `npm run migrate-supabase-json-store` locally with the Supabase env vars set before relying on the new structured tables.
+
 ## Smoke Checks
 
 After deploy:
@@ -60,6 +63,7 @@ After deploy:
 - Log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 - Try `/api/documents` only after logging in; unauthenticated requests should return `401`, not static-host `404`.
 - Restart/redeploy and confirm users, profiles, matches, opportunities, and document metadata remain.
+- In Supabase Table Editor, confirm records appear in the structured tables.
 
 ## Common Free-Tier Issues
 
