@@ -16,6 +16,8 @@ const UserProfile = require('../models/UserProfile');
 const { readJsonArray, writeJsonArray } = require('../utils/jsonStore');
 
 const PROFILES_FILE = 'userProfiles.json';
+const MAX_PROFILE_TEXT_CHARS = 3000;
+const PROFILE_OUTPUT_TOKEN_LIMIT = 700;
 
 const STRING_FIELDS = [
   'country', 'city', 'profession', 'educationLevel',
@@ -25,30 +27,19 @@ const ARRAY_FIELDS = ['skills', 'sectorInterests', 'preferredOpportunityTypes', 
 const BOOLEAN_FIELDS = ['travelAvailable', 'passportAvailable', 'businessRegistered'];
 
 function buildPrompt(text) {
+  const safeText = trimForPrompt(text, MAX_PROFILE_TEXT_CHARS);
   return [
-    'Extract structured profile information from the user\'s message.',
-    'Return ONLY a JSON object. Include a field ONLY if the message clearly states it.',
-    'Omit (do not guess) anything that is not stated.',
-    '',
-    'Fields (all optional):',
-    '- country (string)',
-    '- city (string)',
-    '- profession (string)',
-    '- educationLevel (string)',
-    '- skills (array of strings)',
-    '- businessType (string)',
-    '- businessStage (string, e.g. "idea", "early-stage", "growth")',
-    '- sectorInterests (array of strings, e.g. ["technology","education"])',
-    '- fundingNeeds (string)',
-    '- travelAvailable (boolean)',
-    '- passportAvailable (boolean)',
-    '- businessRegistered (boolean)',
-    '- preferredOpportunityTypes (array; allowed values: grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, startup_programme)',
-    '- bio (string, a short one-line summary)',
-    '- portfolioLinks (array of URLs)',
-    '',
-    `User message: """${text}"""`
+    'Extract only clearly stated profile data. Do not guess. Return JSON only; omit unknown fields.',
+    'Fields: country, city, profession, educationLevel, skills[], businessType, businessStage, sectorInterests[], fundingNeeds, travelAvailable, passportAvailable, businessRegistered, preferredOpportunityTypes[], bio, portfolioLinks[].',
+    'preferredOpportunityTypes values: grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, startup_programme.',
+    `Message: ${safeText}`
   ].join('\n');
+}
+
+function trimForPrompt(value, maxChars) {
+  const text = String(value || '').trim();
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars).trim()} [truncated]`;
 }
 
 function isMeaningful(value) {
@@ -145,7 +136,7 @@ async function extractAndUpdate(userId, text) {
     return { aiUsed: false, error: aiProvider.disabledReason() };
   }
 
-  const extracted = await aiProvider.write(buildPrompt(text), { expectJson: true });
+  const extracted = await aiProvider.write(buildPrompt(text), { expectJson: true, maxOutputTokens: PROFILE_OUTPUT_TOKEN_LIMIT });
 
   if (!extracted || typeof extracted !== 'object' || Array.isArray(extracted)) {
     return {

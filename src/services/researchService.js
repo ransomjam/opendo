@@ -20,6 +20,12 @@ const Opportunity = require('../models/Opportunity');
 const { readJsonArray, writeJsonArray } = require('../utils/jsonStore');
 
 const OPPORTUNITIES_FILE = 'opportunities.json';
+const DEFAULT_RESEARCH_LIMIT = 4;
+const MAX_RESEARCH_LIMIT = 4;
+const MAX_RESEARCH_QUERY_CHARS = 500;
+const MAX_PASTED_OPPORTUNITY_CHARS = 6000;
+const RESEARCH_OUTPUT_TOKEN_LIMIT = 2200;
+const EXTRACTION_OUTPUT_TOKEN_LIMIT = 1200;
 
 const CATEGORY_SYNONYMS = {
   grant: 'grant',
@@ -90,69 +96,28 @@ function asText(value) {
   return String(value).trim();
 }
 
+function trimForPrompt(value, maxChars) {
+  const text = String(value || '').trim();
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars).trim()} [truncated]`;
+}
+
 function buildResearchPrompt(query, limit) {
+  const safeQuery = trimForPrompt(query, MAX_RESEARCH_QUERY_CHARS);
   return [
-    'You are an opportunity research assistant. Using web search, find REAL, currently-relevant',
-    'opportunities (grants, funding, exhibitions, networking events, fellowships, training, competitions,',
-    'tenders, scholarships, startup programmes) that match the request below.',
-    '',
-    'STRICT RULES:',
-    '- Only include opportunities you found on the web and can link to. Each MUST have a real sourceUrl.',
-    '- Do NOT invent deadlines. If unknown, use null.',
-    '- Do NOT invent application links. If unknown, use null (the source link will be used instead).',
-    '- Prefer official organisation pages over aggregators.',
-    `- Return at most ${limit} opportunities.`,
-    '',
-    'Return ONLY a JSON object of the form:',
-    '{ "opportunities": [ {',
-    '  "title": string,',
-    '  "organisation": string,',
-    '  "category": one of [grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, startup_programme, other],',
-    '  "description": string (1-3 sentences),',
-    '  "countryScope": string (e.g. "Cameroon", "Africa", "International"),',
-    '  "location": string (e.g. "Online", "Cameroon"),',
-    '  "deadline": string ISO date or null,',
-    '  "fundingAmount": string or "",',
-    '  "benefits": string,',
-    '  "eligibility": string,',
-    '  "requiredDocuments": string (e.g. "CV, pitch deck, budget"),',
-    '  "applicationSteps": string,',
-    '  "applicationLink": string URL or null,',
-    '  "sourceUrl": string URL (required)',
-    '} ] }',
-    '',
-    `Request: """${query}"""`
+    `Find up to ${limit} real, current opportunities matching the request. Use web search.`,
+    'Rules: sourceUrl is required; prefer official pages; do not invent deadlines or links; use null/"" when unknown; keep text concise.',
+    'Return JSON only: {"opportunities":[{"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,startup_programme,other","description":"1-2 short sentences","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":""}]}',
+    `Request: ${safeQuery}`
   ].join('\n');
 }
 
 function buildExtractionPrompt(text) {
+  const safeText = trimForPrompt(text, MAX_PASTED_OPPORTUNITY_CHARS);
   return [
-    'Extract a single opportunity from the pasted text below into structured JSON.',
-    '',
-    'STRICT RULES:',
-    '- Do NOT invent a deadline. If not present, use null.',
-    '- Do NOT invent an application link. If not present, use null.',
-    '- Only use URLs that actually appear in the text.',
-    '',
-    'Return ONLY a JSON object:',
-    '{',
-    '  "title": string,',
-    '  "organisation": string,',
-    '  "category": one of [grant, funding, exhibition, networking, fellowship, training, competition, tender, scholarship, startup_programme, other],',
-    '  "description": string,',
-    '  "countryScope": string,',
-    '  "location": string,',
-    '  "deadline": string ISO date or null,',
-    '  "fundingAmount": string or "",',
-    '  "benefits": string,',
-    '  "eligibility": string,',
-    '  "requiredDocuments": string,',
-    '  "applicationSteps": string,',
-    '  "applicationLink": string URL or null,',
-    '  "sourceUrl": string URL or null',
-    '}',
-    '',
-    `Pasted text: """${text}"""`
+    'Extract one opportunity. Do not invent missing deadlines or links; only use URLs present in the text.',
+    'Return JSON only: {"title":"","organisation":"","category":"one of grant,funding,exhibition,networking,fellowship,training,competition,tender,scholarship,startup_programme,other","description":"","countryScope":"","location":"","deadline":null,"fundingAmount":"","benefits":"","eligibility":"","requiredDocuments":"","applicationSteps":"","applicationLink":null,"sourceUrl":null}',
+    `Text: ${safeText}`
   ].join('\n');
 }
 
@@ -303,7 +268,11 @@ function envFlag(name, fallback) {
 
 async function researchOpportunities(userId, options = {}) {
   const query = (options.query || '').trim();
-  const limit = Math.max(1, Math.min(Number(options.limit) || 10, 20));
+  const requestedLimit = Number(options.limit);
+  const limit = Math.max(
+    1,
+    Math.min(Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : DEFAULT_RESEARCH_LIMIT, MAX_RESEARCH_LIMIT)
+  );
   const saveResults = options.saveResults !== undefined ? options.saveResults : envFlag('AUTO_SAVE_RESEARCH_RESULTS', true);
   const matchResults = options.matchResults !== undefined ? options.matchResults : envFlag('AUTO_MATCH_RESEARCH_RESULTS', true);
 
@@ -318,7 +287,7 @@ async function researchOpportunities(userId, options = {}) {
     };
   }
 
-  const result = await aiProvider.research(buildResearchPrompt(query, limit));
+  const result = await aiProvider.research(buildResearchPrompt(query, limit), { maxOutputTokens: RESEARCH_OUTPUT_TOKEN_LIMIT });
   if (result.error) {
     return { success: false, message: result.error };
   }
@@ -378,7 +347,7 @@ async function extractFromText(userId, text, options = {}) {
     };
   }
 
-  const parsed = await aiProvider.write(buildExtractionPrompt(text), { expectJson: true });
+  const parsed = await aiProvider.write(buildExtractionPrompt(text), { expectJson: true, maxOutputTokens: EXTRACTION_OUTPUT_TOKEN_LIMIT });
   // A pasted opportunity is allowed even without a link (kept as a private note),
   // but we still mark it unverified.
   const candidate = normaliseCandidate(parsed, { requireLink: false });

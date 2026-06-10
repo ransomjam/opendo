@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const researchService = require('../services/researchService');
 
 // POST /api/research/opportunities
-// Body: { query, saveResults=true, matchResults=true, limit=10 }
+// Body: { query, saveResults=true, matchResults=true, limit=4 } (server caps at 4)
 router.post('/opportunities', requireAuth, async (req, res) => {
   try {
     const { query, saveResults, matchResults, limit } = req.body || {};

@@ -68,4 +68,38 @@ router.patch('/:stepId/status', requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/action-steps/:stepId - update status, due date, priority, or notes
+router.patch('/:stepId', requireAuth, async (req, res) => {
+  try {
+    const all = await loadSteps();
+    const index = all.findIndex(step => step.id === req.params.stepId && step.userId === req.user.id);
+
+    if (index === -1) {
+      return res.status(404).json({ success: false, message: 'Action step not found' });
+    }
+
+    const step = new ActionStep(all[index]);
+    const allowed = {};
+    ['status', 'priority', 'dueDate', 'notes'].forEach(key => {
+      if (req.body && req.body[key] !== undefined) {
+        allowed[key] = req.body[key];
+      }
+    });
+
+    if (!step.update(allowed)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid action step update'
+      });
+    }
+
+    all[index] = step.toObject();
+    await writeJsonArray(ACTION_STEPS_FILE, all);
+
+    res.json({ success: true, message: 'Action step updated', data: all[index] });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error updating action step', error: error.message });
+  }
+});
+
 module.exports = router;

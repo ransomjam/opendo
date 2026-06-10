@@ -23,6 +23,9 @@ class ActionStep {
     this.description = data.description ?? '';
     this.status = ALLOWED_STATUSES.includes(data.status) ? data.status : 'not_started';
     this.priority = ALLOWED_PRIORITIES.includes(data.priority) ? data.priority : 'medium';
+    this.dueDate = data.dueDate ?? null;
+    this.notes = data.notes ?? '';
+    this.completedAt = data.completedAt ?? null;
     this.createdAt = data.createdAt || new Date().toISOString();
     this.updatedAt = data.updatedAt || new Date().toISOString();
   }
@@ -38,10 +41,33 @@ class ActionStep {
   updateStatus(status) {
     if (ALLOWED_STATUSES.includes(status)) {
       this.status = status;
+      this.completedAt = status === 'completed' ? (this.completedAt || new Date().toISOString()) : null;
       this.updatedAt = new Date().toISOString();
       return true;
     }
     return false;
+  }
+
+  update(data = {}) {
+    if (data.status !== undefined && !this.updateStatus(data.status)) {
+      return false;
+    }
+
+    if (data.priority !== undefined) {
+      if (!ALLOWED_PRIORITIES.includes(data.priority)) return false;
+      this.priority = data.priority;
+    }
+
+    if (data.dueDate !== undefined) {
+      this.dueDate = data.dueDate || null;
+    }
+
+    if (data.notes !== undefined) {
+      this.notes = String(data.notes || '');
+    }
+
+    this.updatedAt = new Date().toISOString();
+    return true;
   }
 
   toObject() {
@@ -53,6 +79,9 @@ class ActionStep {
       description: this.description,
       status: this.status,
       priority: this.priority,
+      dueDate: this.dueDate,
+      notes: this.notes,
+      completedAt: this.completedAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };

@@ -18,6 +18,8 @@ const { readJsonArray } = require('../utils/jsonStore');
 
 const OPPORTUNITIES_FILE = 'opportunities.json';
 const ACTION_STEPS_FILE = 'actionSteps.json';
+const GENERAL_ANSWER_OUTPUT_TOKEN_LIMIT = 300;
+const MAX_GENERAL_MESSAGE_CHARS = 1000;
 
 const MODE_TO_INTENT = {
   profile: 'update_profile',
@@ -219,16 +221,12 @@ function renderTodayMessage(plan) {
 
 async function answerGeneral(message) {
   if (aiProvider.isEnabled()) {
+    const safeMessage = trimForPrompt(message, MAX_GENERAL_MESSAGE_CHARS);
     const prompt = [
-      'You are Opendo, a friendly assistant that helps people in Africa find and apply to',
-      'opportunities (grants, funding, exhibitions, networking, fellowships, scholarships).',
-      'Answer the user briefly and practically. If they should use a feature, tell them they can:',
-      'type what they are looking for to research opportunities, paste an opportunity to save it,',
-      'paste info about themselves to update their profile, or ask "what should I do today?".',
-      '',
-      `User: ${message}`
+      'You are Opendo. Answer briefly and practically about finding/applying to opportunities. Mention app features only if useful.',
+      `User: ${safeMessage}`
     ].join('\n');
-    const text = await aiProvider.write(prompt, { expectJson: false });
+    const text = await aiProvider.write(prompt, { expectJson: false, maxOutputTokens: GENERAL_ANSWER_OUTPUT_TOKEN_LIMIT });
     if (text) return text;
   }
   return [
@@ -238,6 +236,12 @@ async function answerGeneral(message) {
     '- Paste an opportunity announcement to save it',
     '- Ask "What opportunities fit me best?" or "What should I do today?"'
   ].join('\n');
+}
+
+function trimForPrompt(value, maxChars) {
+  const text = String(value || '').trim();
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars).trim()} [truncated]`;
 }
 
 // ---- Main entry -------------------------------------------------------------

@@ -119,6 +119,28 @@
       <div class="grid" id="summaryGrid"></div>
     </section>
 
+    <!-- APPLICATION WORKSPACE -->
+    <section class="card">
+      <div class="flex-between">
+        <h2>Application Workspace</h2>
+        <div class="row" style="flex:0">
+          <select id="applicationStatusFilter" onchange="renderWorkspace()">
+            <option value="active">Active</option>
+            <option value="">All statuses</option>
+            <option value="new">New</option>
+            <option value="saved">Saved</option>
+            <option value="interested">Interested</option>
+            <option value="applying">Applying</option>
+            <option value="submitted">Submitted</option>
+            <option value="ignored">Ignored</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid" id="workspaceSummary"></div>
+      <div id="workspaceDueNow" style="margin-top:12px"></div>
+      <div id="workspaceList" style="margin-top:12px"></div>
+    </section>
+
     <!-- PROFILE -->
     <section class="card">
       <h2>My Profile</h2>
@@ -220,6 +242,7 @@ let TOKEN = localStorage.getItem('opendo_token') || '';
 let USER = JSON.parse(localStorage.getItem('opendo_user') || 'null');
 let MATCHES = [];
 let OPPS = {};
+let WORKSPACE = { items: [] };
 
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 function headers(extra={}){ const h={...extra}; if(TOKEN) h['Authorization']='Bearer '+TOKEN; return h; }
@@ -360,7 +383,7 @@ async function uploadDoc(){
   try{
     await api('/api/documents',{method:'POST',headers:headers(),body:fd});
     document.getElementById('docMsg').textContent='Uploaded.'; toast('Document uploaded');
-    fileEl.value=''; loadDocuments();
+    fileEl.value=''; await loadDocuments(); await loadWorkspace();
   }catch(e){ document.getElementById('docMsg').textContent='Upload failed: '+e.message; }
 }
 
@@ -384,6 +407,125 @@ async function loadSummary(){
     ];
     document.getElementById('summaryGrid').innerHTML=items.map(([l,n])=>`<div class="stat"><div class="n">${n??0}</div><div class="l">${l}</div></div>`).join('');
   }catch(e){ document.getElementById('summaryGrid').innerHTML='<p class="muted">Summary unavailable: '+e.message+'</p>'; }
+}
+async function loadWorkspace(){
+  try{
+    WORKSPACE=await api('/api/application-workspace',{headers:headers()});
+  }catch(e){
+    WORKSPACE={items:[],error:e.message};
+  }
+  renderWorkspace();
+}
+function renderWorkspace(){
+  const summary=document.getElementById('workspaceSummary');
+  const dueBox=document.getElementById('workspaceDueNow');
+  const listBox=document.getElementById('workspaceList');
+  if(WORKSPACE.error){
+    summary.innerHTML='';
+    dueBox.innerHTML='';
+    listBox.innerHTML='<p class="muted">Workspace unavailable: '+esc(WORKSPACE.error)+'</p>';
+    return;
+  }
+  const s=WORKSPACE.summary||{};
+  const stats=[
+    ['Active applications',s.activeApplications],['Applying',s.applying],['Submitted',s.submitted],
+    ['Due now',s.dueNow],['Urgent deadlines',s.urgentDeadlines]
+  ];
+  summary.innerHTML=stats.map(([l,n])=>`<div class="stat"><div class="n">${n??0}</div><div class="l">${l}</div></div>`).join('');
+
+  const dueNow=WORKSPACE.dueNow||[];
+  dueBox.innerHTML=dueNow.length ? `<div class="opp" style="background:#fef7e0">
+    <strong>Due now</strong>
+    <ul>${dueNow.map(item=>`<li>${esc(item.step.title)} - ${esc(item.opportunity.title||'opportunity')} ${item.step.dueDate?`<span class="tag">due ${esc(item.step.dueDate)}</span>`:''}</li>`).join('')}</ul>
+  </div>` : '';
+
+  const filter=document.getElementById('applicationStatusFilter').value;
+  const items=(WORKSPACE.items||[]).filter(item=>{
+    if(filter==='active') return item.match.status!=='ignored' && item.match.status!=='submitted';
+    return !filter || item.match.status===filter;
+  });
+  listBox.innerHTML=items.length ? items.map(renderWorkspaceItem).join('') : '<p class="muted">No applications match this filter.</p>';
+}
+function renderWorkspaceItem(item, index){
+  const o=item.opportunity||{};
+  const m=item.match||{};
+  const docs=item.documents||{};
+  const appLink=o.applicationLink||o.sourceUrl||'';
+  const note=(item.note&&item.note.content)||'';
+  const deadline=item.daysUntilDeadline;
+  const deadlineText=deadline===null ? '' : (deadline<0 ? 'deadline passed' : (deadline===0 ? 'due today' : `due in ${deadline} day(s)`));
+  const missing=(docs.missing||[]).map(d=>`<span class="pill">${esc(d)}</span>`).join('')||'<span class="muted">none</span>';
+  const available=(docs.available||[]).map(d=>`<span class="pill">${esc(d)}</span>`).join('')||'<span class="muted">none detected</span>';
+  const steps=(item.steps||[]).map(renderWorkspaceStep).join('')||'<p class="muted">No checklist yet. Recalculate matches to generate steps.</p>';
+  return `<div class="opp">
+    <div class="flex-between">
+      <div>
+        <h3>${esc(o.title||'(opportunity)')}</h3>
+        <div class="muted">${esc(o.organisation||'')}${o.deadline?(' - deadline '+esc(o.deadline)):''}${deadlineText?(' - '+esc(deadlineText)):''}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="score">${m.matchScore}</div>
+        <span class="badge ${m.matchLevel}">${esc((m.matchLevel||'').replace(/_/g,' '))}</span>
+      </div>
+    </div>
+    <div style="margin:8px 0; display:flex; gap:6px; flex-wrap:wrap">
+      <span class="tag">Status: ${esc(m.status||'new')}</span>
+      <span class="tag">Documents: ${esc(docs.readinessLabel||'unknown')}</span>
+      ${item.nextStep?`<span class="tag">Next: ${esc(item.nextStep.title)}</span>`:''}
+    </div>
+    <div class="row">
+      <div><strong>Ready documents</strong><div style="margin-top:4px">${available}</div></div>
+      <div><strong>Missing documents</strong><div style="margin-top:4px">${missing}</div></div>
+    </div>
+    <div style="margin-top:10px">
+      <strong>Checklist</strong>
+      <div>${steps}</div>
+    </div>
+    <label for="workspace_note_${index}">Application notes</label>
+    <textarea id="workspace_note_${index}" rows="2" placeholder="Save eligibility doubts, contacts, answers, or useful links.">${esc(note)}</textarea>
+    <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
+      <button class="small" onclick="saveWorkspaceNote('${escAttr(o.id)}','workspace_note_${index}')">Save note</button>
+      ${appLink?`<a href="${escAttr(appLink)}" target="_blank" rel="noopener"><button class="small">Open application</button></a>`:''}
+      ${['saved','interested','applying','submitted','ignored'].map(status=>`<button class="small ${m.status===status?'':'secondary'}" onclick="setStatus('${m.id}','${status}')">${status}</button>`).join('')}
+    </div>
+  </div>`;
+}
+function renderWorkspaceStep(step){
+  return `<div class="flex-between" style="padding:8px 0; border-bottom:1px solid var(--line)">
+    <div>
+      <div><strong>${esc(step.title)}</strong> <span class="tag">${esc(step.priority)}</span></div>
+      <div class="muted">${esc(step.description||'')}</div>
+      ${step.notes?`<div class="muted">Note: ${esc(step.notes)}</div>`:''}
+    </div>
+    <div class="row" style="flex:0; min-width:280px">
+      <div style="min-width:130px">
+        <label>Status</label>
+        <select onchange="updateStep('${escAttr(step.id)}',{status:this.value})">
+          ${['not_started','in_progress','completed','skipped'].map(s=>`<option value="${s}" ${step.status===s?'selected':''}>${s.replace('_',' ')}</option>`).join('')}
+        </select>
+      </div>
+      <div style="min-width:130px">
+        <label>Due</label>
+        <input type="date" value="${escAttr(step.dueDate||'')}" onchange="updateStep('${escAttr(step.id)}',{dueDate:this.value})" />
+      </div>
+    </div>
+  </div>`;
+}
+async function updateStep(stepId, patch){
+  try{
+    await jsonPost('/api/action-steps/'+encodeURIComponent(stepId),patch,'PATCH');
+    toast('Step updated');
+    await loadWorkspace();
+    await loadSummary();
+  }catch(e){ toast('Failed: '+e.message); }
+}
+async function saveWorkspaceNote(opportunityId, textareaId){
+  const el=document.getElementById(textareaId);
+  try{
+    await jsonPost('/api/application-workspace/'+encodeURIComponent(opportunityId)+'/note',{content:el.value},'PUT');
+    toast('Note saved');
+    await loadWorkspace();
+  }catch(e){ toast('Failed: '+e.message); }
 }
 async function loadOpps(){
   try{ const body=await api('/api/opportunities',{headers:headers()});
@@ -445,7 +587,7 @@ function renderMatches(){
 }
 async function setStatus(matchId,status){
   try{ await jsonPost('/api/matches/'+encodeURIComponent(matchId)+'/status',{status},'PATCH');
-    toast('Marked '+status); await loadMatches(); await loadSummary();
+    toast('Marked '+status); await loadMatches(); await loadWorkspace(); await loadSummary();
   }catch(e){ toast('Failed: '+e.message); }
 }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
@@ -488,7 +630,7 @@ async function askAI(){
   try{
     const body=await jsonPost('/api/assistant/chat',{message,mode});
     renderAIResponse(body);
-    loadSummary(); loadMatches();
+    loadSummary(); loadMatches(); loadWorkspace();
     if(body.intent==='update_profile') loadProfile();
   }catch(e){ out.innerHTML='<p class="danger">'+esc(e.message)+'</p>'; }
   finally{ btn.disabled=false; btn.textContent=old; }
@@ -540,11 +682,11 @@ async function updateProfileFromText(){
   try{
     const body=await jsonPost('/api/assistant/chat',{message,mode:'profile'});
     document.getElementById('profileHelperMsg').textContent=body.message||'';
-    toast('Profile updated'); loadProfile(); loadSummary();
+    toast('Profile updated'); loadProfile(); loadSummary(); loadWorkspace();
   }catch(e){ document.getElementById('profileHelperMsg').textContent='Failed: '+e.message; }
 }
 
-async function loadAll(){ await loadOpps(); await Promise.all([loadAIStatus(),loadProfile(),loadDocuments(),loadSummary(),loadMatches()]); }
+async function loadAll(){ await loadOpps(); await Promise.all([loadAIStatus(),loadProfile(),loadDocuments(),loadSummary(),loadMatches(),loadWorkspace()]); }
 
 async function boot(){
   fillDocTypes();

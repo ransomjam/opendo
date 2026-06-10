@@ -110,7 +110,7 @@ function geminiErrorMessage(error, kind) {
   return `Gemini ${kind} failed. Check the Render logs for the Gemini error.`;
 }
 
-async function geminiGenerate({ prompt, useSearch, jsonMode }) {
+async function geminiGenerate({ prompt, useSearch, jsonMode, maxOutputTokens }) {
   const ai = getGemini();
   if (!ai) return null;
 
@@ -119,6 +119,9 @@ async function geminiGenerate({ prompt, useSearch, jsonMode }) {
     : (process.env.GEMINI_WRITING_MODEL || process.env.GEMINI_RESEARCH_MODEL || 'gemini-2.5-flash');
 
   const config = { temperature: 0.2 };
+  if (Number.isFinite(maxOutputTokens) && maxOutputTokens > 0) {
+    config.maxOutputTokens = maxOutputTokens;
+  }
   if (useSearch) {
     config.tools = [{ googleSearch: {} }];
   } else if (jsonMode) {
@@ -133,11 +136,11 @@ async function geminiGenerate({ prompt, useSearch, jsonMode }) {
   return { text, citations: extractGeminiCitations(response) };
 }
 
-async function research(prompt) {
+async function research(prompt, options = {}) {
   if (!isEnabled()) return { error: disabledReason() };
 
   try {
-    const result = await geminiGenerate({ prompt, useSearch: true });
+    const result = await geminiGenerate({ prompt, useSearch: true, maxOutputTokens: options.maxOutputTokens });
     if (result && result.text) return { provider: 'gemini', ...result };
   } catch (error) {
     console.error('[aiProvider] Gemini research failed:', error && (error.stack || error.message || error));
@@ -146,11 +149,11 @@ async function research(prompt) {
   return { error: 'Gemini research returned no content. Check the Render logs and Gemini model settings.' };
 }
 
-async function write(prompt, { expectJson = true } = {}) {
+async function write(prompt, { expectJson = true, maxOutputTokens } = {}) {
   if (!isEnabled()) return null;
 
   try {
-    const result = await geminiGenerate({ prompt, jsonMode: expectJson });
+    const result = await geminiGenerate({ prompt, jsonMode: expectJson, maxOutputTokens });
     if (result && result.text) {
       return expectJson ? parseJsonLoose(result.text) : result.text;
     }

@@ -214,6 +214,9 @@ const COLLECTIONS = {
       description: item.description || '',
       status: item.status || 'not_started',
       priority: item.priority || 'medium',
+      due_date: item.dueDate || null,
+      notes: item.notes || '',
+      completed_at: item.completedAt || null,
       created_at: timestamp(item.createdAt),
       updated_at: timestamp(item.updatedAt)
     }),
@@ -225,6 +228,28 @@ const COLLECTIONS = {
       description: row.description || '',
       status: row.status || 'not_started',
       priority: row.priority || 'medium',
+      dueDate: row.due_date || null,
+      notes: row.notes || '',
+      completedAt: row.completed_at || null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    })
+  },
+  'applicationNotes.json': {
+    table: 'application_notes',
+    toRow: item => ({
+      id: item.id,
+      user_id: item.userId,
+      opportunity_id: item.opportunityId,
+      content: item.content || '',
+      created_at: timestamp(item.createdAt),
+      updated_at: timestamp(item.updatedAt)
+    }),
+    fromRow: row => ({
+      id: row.id,
+      userId: row.user_id,
+      opportunityId: row.opportunity_id,
+      content: row.content || '',
       createdAt: row.created_at,
       updatedAt: row.updated_at
     })

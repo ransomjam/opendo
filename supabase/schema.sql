@@ -108,9 +108,26 @@ create table if not exists public.action_steps (
   description text not null default '',
   status text not null default 'not_started',
   priority text not null default 'medium',
+  due_date text,
+  notes text not null default '',
+  completed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists public.application_notes (
+  id uuid primary key,
+  user_id uuid not null references public.users(id) on delete cascade,
+  opportunity_id text not null references public.opportunities(id) on delete cascade,
+  content text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, opportunity_id)
+);
+
+alter table public.action_steps add column if not exists due_date text;
+alter table public.action_steps add column if not exists notes text not null default '';
+alter table public.action_steps add column if not exists completed_at timestamptz;
 
 create index if not exists users_email_idx on public.users (email);
 create index if not exists user_profiles_user_id_idx on public.user_profiles (user_id);
@@ -123,6 +140,9 @@ create index if not exists user_opportunity_matches_user_id_idx on public.user_o
 create index if not exists user_opportunity_matches_opportunity_id_idx on public.user_opportunity_matches (opportunity_id);
 create index if not exists action_steps_user_id_idx on public.action_steps (user_id);
 create index if not exists action_steps_opportunity_id_idx on public.action_steps (opportunity_id);
+create index if not exists action_steps_due_date_idx on public.action_steps (due_date);
+create index if not exists application_notes_user_id_idx on public.application_notes (user_id);
+create index if not exists application_notes_opportunity_id_idx on public.application_notes (opportunity_id);
 
 alter table public.opendo_json_store enable row level security;
 alter table public.users enable row level security;
@@ -131,6 +151,7 @@ alter table public.opportunities enable row level security;
 alter table public.user_documents enable row level security;
 alter table public.user_opportunity_matches enable row level security;
 alter table public.action_steps enable row level security;
+alter table public.application_notes enable row level security;
 
 insert into public.opendo_json_store (file_name, data)
 values
@@ -139,7 +160,8 @@ values
   ('userDocuments.json', '[]'::jsonb),
   ('opportunities.json', '[]'::jsonb),
   ('userOpportunityMatches.json', '[]'::jsonb),
-  ('actionSteps.json', '[]'::jsonb)
+  ('actionSteps.json', '[]'::jsonb),
+  ('applicationNotes.json', '[]'::jsonb)
 on conflict (file_name) do nothing;
 
 insert into storage.buckets (id, name, public)

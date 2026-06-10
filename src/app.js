@@ -41,6 +41,7 @@ const actionStepsRouter = require('./routes/actionSteps');
 const dashboardRouter = require('./routes/dashboard');
 const assistantRouter = require('./routes/assistant');
 const researchRouter = require('./routes/research');
+const applicationWorkspaceRouter = require('./routes/applicationWorkspace');
 
 app.use('/api/auth', authRouter);
 app.use('/api/profile', profileRouter);
@@ -51,6 +52,7 @@ app.use('/api/action-steps', actionStepsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/assistant', assistantRouter);
 app.use('/api/research', researchRouter);
+app.use('/api/application-workspace', applicationWorkspaceRouter);
 
 // Not found handler
 app.use((req, res) => {

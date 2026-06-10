@@ -68,6 +68,32 @@ function daysUntil(deadline) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+function toDateOnly(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(date, days) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function deadlineDate(opportunity) {
+  if (!opportunity.deadline) return null;
+  const parsed = new Date(opportunity.deadline);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function dueBeforeDeadline(opportunity, daysBefore) {
+  const deadline = deadlineDate(opportunity);
+  if (!deadline) return null;
+
+  const today = new Date();
+  const due = addDays(deadline, -daysBefore);
+  if (due < today) return toDateOnly(today);
+  return toDateOnly(due);
+}
+
 // ---- Individual score components ----
 
 function scoreEligibility(profile, opportunity) {
@@ -263,19 +289,22 @@ function scoreValue(opportunity) {
 // Build the action steps for a given match (without persisting).
 function buildActionSteps(opportunity, missingDocuments, urgency) {
   const steps = [];
+  const deadline = deadlineDate(opportunity);
 
   missingDocuments.forEach(label => {
     steps.push({
       title: `Prepare your ${label}`,
       description: `This opportunity lists "${label}" as a required document. Upload it to improve your readiness.`,
-      priority: 'high'
+      priority: 'high',
+      dueDate: dueBeforeDeadline(opportunity, 5)
     });
   });
 
   steps.push({
     title: 'Review eligibility requirements',
     description: 'Read the eligibility section carefully and confirm you qualify before applying.',
-    priority: 'medium'
+    priority: 'medium',
+    dueDate: dueBeforeDeadline(opportunity, 10)
   });
 
   steps.push({
@@ -283,7 +312,8 @@ function buildActionSteps(opportunity, missingDocuments, urgency) {
     description: opportunity.applicationLink
       ? `Visit ${opportunity.applicationLink} and verify the official requirements and deadline.`
       : 'Find the official application page and verify the requirements and deadline.',
-    priority: 'medium'
+    priority: urgency.days !== null && urgency.days >= 0 && urgency.days <= 7 ? 'high' : 'medium',
+    dueDate: toDateOnly(new Date())
   });
 
   let submitPriority = 'medium';
@@ -295,7 +325,8 @@ function buildActionSteps(opportunity, missingDocuments, urgency) {
     description: opportunity.deadline
       ? `Make sure your application is submitted before ${opportunity.deadline}.`
       : 'Submit your application before the stated deadline.',
-    priority: submitPriority
+    priority: submitPriority,
+    dueDate: deadline ? toDateOnly(deadline) : null
   });
 
   return steps;
@@ -384,6 +415,9 @@ async function persistActionSteps(userId, opportunityId, drafts) {
       // Preserve user progress but refresh description/priority.
       previous.description = draft.description;
       previous.priority = draft.priority;
+      if (!previous.dueDate && draft.dueDate) {
+        previous.dueDate = draft.dueDate;
+      }
       previous.updatedAt = new Date().toISOString();
       kept.push(previous);
     } else {
