@@ -13,46 +13,54 @@ function validationError(res, errors) {
   });
 }
 
-router.get('/', requireAuth, (req, res) => {
-  const profiles = readJsonArray('userProfiles.json').map(profile => new UserProfile(profile));
-  const profile = profiles.find(item => item.userId === req.user.id);
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const profiles = (await readJsonArray('userProfiles.json')).map(profile => new UserProfile(profile));
+    const profile = profiles.find(item => item.userId === req.user.id);
 
-  return res.json({
-    success: true,
-    profile: profile ? profile.toObject() : null
-  });
+    return res.json({
+      success: true,
+      profile: profile ? profile.toObject() : null
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error fetching profile', error: error.message });
+  }
 });
 
-router.put('/', requireAuth, (req, res) => {
-  const validation = UserProfile.validatePayload(req.body);
+router.put('/', requireAuth, async (req, res) => {
+  try {
+    const validation = UserProfile.validatePayload(req.body);
 
-  if (!validation.isValid) {
-    return validationError(res, validation.errors);
-  }
+    if (!validation.isValid) {
+      return validationError(res, validation.errors);
+    }
 
-  const profiles = readJsonArray('userProfiles.json').map(profile => new UserProfile(profile));
-  const profileIndex = profiles.findIndex(item => item.userId === req.user.id);
-  let profile;
+    const profiles = (await readJsonArray('userProfiles.json')).map(profile => new UserProfile(profile));
+    const profileIndex = profiles.findIndex(item => item.userId === req.user.id);
+    let profile;
 
-  if (profileIndex === -1) {
-    profile = new UserProfile({
-      ...req.body,
-      userId: req.user.id
+    if (profileIndex === -1) {
+      profile = new UserProfile({
+        ...req.body,
+        userId: req.user.id
+      });
+      profiles.push(profile);
+    } else {
+      profile = profiles[profileIndex];
+      profile.update(req.body);
+      profiles[profileIndex] = profile;
+    }
+
+    await writeJsonArray('userProfiles.json', profiles.map(item => item.toObject()));
+
+    return res.json({
+      success: true,
+      message: 'Profile saved successfully',
+      profile: profile.toObject()
     });
-    profiles.push(profile);
-  } else {
-    profile = profiles[profileIndex];
-    profile.update(req.body);
-    profiles[profileIndex] = profile;
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error saving profile', error: error.message });
   }
-
-  writeJsonArray('userProfiles.json', profiles.map(item => item.toObject()));
-
-  return res.json({
-    success: true,
-    message: 'Profile saved successfully',
-    profile: profile.toObject()
-  });
 });
 
 module.exports = router;

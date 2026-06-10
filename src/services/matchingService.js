@@ -27,17 +27,17 @@ const DOCUMENT_MATCHERS = [
   { type: 'budget', label: 'Budget', test: text => /budget/.test(text) }
 ];
 
-function loadOpportunities() {
-  return readJsonArray(OPPORTUNITIES_FILE).map(data => new Opportunity(data));
+async function loadOpportunities() {
+  return (await readJsonArray(OPPORTUNITIES_FILE)).map(data => new Opportunity(data));
 }
 
-function loadProfile(userId) {
-  const profiles = readJsonArray(PROFILES_FILE).map(data => new UserProfile(data));
+async function loadProfile(userId) {
+  const profiles = (await readJsonArray(PROFILES_FILE)).map(data => new UserProfile(data));
   return profiles.find(profile => profile.userId === userId) || null;
 }
 
-function loadDocuments(userId) {
-  return readJsonArray(DOCUMENTS_FILE)
+async function loadDocuments(userId) {
+  return (await readJsonArray(DOCUMENTS_FILE))
     .map(data => new UserDocument(data))
     .filter(doc => doc.userId === userId);
 }
@@ -362,18 +362,18 @@ function computeMatch(profile, documents, opportunity) {
 
 // ---- Persistence helpers ----
 
-function readMatches() {
+async function readMatches() {
   return readJsonArray(MATCHES_FILE);
 }
 
-function readActionSteps() {
+async function readActionSteps() {
   return readJsonArray(ACTION_STEPS_FILE);
 }
 
 // Persist (or refresh) action steps for one user + opportunity, avoiding duplicates
 // (matched by title). Existing steps keep their status so user progress is preserved.
-function persistActionSteps(userId, opportunityId, drafts) {
-  const all = readActionSteps();
+async function persistActionSteps(userId, opportunityId, drafts) {
+  const all = await readActionSteps();
   const existing = all.filter(step => step.userId === userId && step.opportunityId === opportunityId);
   const others = all.filter(step => !(step.userId === userId && step.opportunityId === opportunityId));
 
@@ -391,12 +391,12 @@ function persistActionSteps(userId, opportunityId, drafts) {
     }
   });
 
-  writeJsonArray(ACTION_STEPS_FILE, [...others, ...kept]);
+  await writeJsonArray(ACTION_STEPS_FILE, [...others, ...kept]);
   return kept;
 }
 
-function persistMatch(matchObject) {
-  const all = readMatches();
+async function persistMatch(matchObject) {
+  const all = await readMatches();
   const index = all.findIndex(
     item => item.userId === matchObject.userId && item.opportunityId === matchObject.opportunityId
   );
@@ -411,7 +411,7 @@ function persistMatch(matchObject) {
     all[index] = matchObject;
   }
 
-  writeJsonArray(MATCHES_FILE, all);
+  await writeJsonArray(MATCHES_FILE, all);
   return matchObject;
 }
 
@@ -430,9 +430,9 @@ function isMatchableForUser(opportunity, userId) {
 }
 
 async function recalculateForUser(userId, { enhance } = {}) {
-  const profile = loadProfile(userId);
-  const documents = loadDocuments(userId);
-  const opportunities = loadOpportunities().filter(opp => isMatchableForUser(opp, userId));
+  const profile = await loadProfile(userId);
+  const documents = await loadDocuments(userId);
+  const opportunities = (await loadOpportunities()).filter(opp => isMatchableForUser(opp, userId));
 
   const results = [];
   for (const opportunity of opportunities) {
@@ -443,8 +443,8 @@ async function recalculateForUser(userId, { enhance } = {}) {
       await maybeEnhance(match, profile, opportunity);
     }
 
-    const stored = persistMatch(match.toObject());
-    persistActionSteps(userId, opportunity.id, actionStepDrafts);
+    const stored = await persistMatch(match.toObject());
+    await persistActionSteps(userId, opportunity.id, actionStepDrafts);
     results.push(stored);
   }
 
@@ -452,11 +452,11 @@ async function recalculateForUser(userId, { enhance } = {}) {
 }
 
 async function matchOpportunityForUser(userId, opportunityId, { enhance } = {}) {
-  const opportunity = loadOpportunities().find(opp => opp.id === opportunityId);
+  const opportunity = (await loadOpportunities()).find(opp => opp.id === opportunityId);
   if (!opportunity) return null;
 
-  const profile = loadProfile(userId);
-  const documents = loadDocuments(userId);
+  const profile = await loadProfile(userId);
+  const documents = await loadDocuments(userId);
   const { match, actionStepDrafts } = computeMatch(profile, documents, opportunity);
   match.userId = userId;
 
@@ -464,8 +464,8 @@ async function matchOpportunityForUser(userId, opportunityId, { enhance } = {}) 
     await maybeEnhance(match, profile, opportunity);
   }
 
-  const stored = persistMatch(match.toObject());
-  persistActionSteps(userId, opportunityId, actionStepDrafts);
+  const stored = await persistMatch(match.toObject());
+  await persistActionSteps(userId, opportunityId, actionStepDrafts);
   return stored;
 }
 
@@ -493,8 +493,8 @@ async function maybeEnhance(match, profile, opportunity) {
   }
 }
 
-function getMatchesForUser(userId, filters = {}) {
-  let matches = readMatches().filter(match => match.userId === userId);
+async function getMatchesForUser(userId, filters = {}) {
+  let matches = (await readMatches()).filter(match => match.userId === userId);
 
   if (filters.matchLevel) {
     matches = matches.filter(match => match.matchLevel === filters.matchLevel);
@@ -515,14 +515,14 @@ function getMatchesForUser(userId, filters = {}) {
   return matches.sort((a, b) => b.matchScore - a.matchScore);
 }
 
-function getMatchForOpportunity(userId, opportunityId) {
-  return readMatches().find(
+async function getMatchForOpportunity(userId, opportunityId) {
+  return (await readMatches()).find(
     match => match.userId === userId && match.opportunityId === opportunityId
   ) || null;
 }
 
-function updateMatchStatus(userId, matchId, status) {
-  const all = readMatches();
+async function updateMatchStatus(userId, matchId, status) {
+  const all = await readMatches();
   const index = all.findIndex(match => match.id === matchId && match.userId === userId);
   if (index === -1) return { notFound: true };
 
@@ -532,7 +532,7 @@ function updateMatchStatus(userId, matchId, status) {
   }
 
   all[index] = match.toObject();
-  writeJsonArray(MATCHES_FILE, all);
+  await writeJsonArray(MATCHES_FILE, all);
   return { match: all[index] };
 }
 

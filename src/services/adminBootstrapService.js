@@ -26,7 +26,7 @@ async function createOrPromoteAdminFromEnv({ requireConfigured = false } = {}) {
     throw new Error('ADMIN_PASSWORD must be at least 6 characters.');
   }
 
-  const users = readJsonArray(USERS_FILE);
+  const users = await readJsonArray(USERS_FILE);
   const passwordHash = await bcrypt.hash(password, 10);
   const existingIndex = users.findIndex(
     user => String(user.email).trim().toLowerCase() === email
@@ -39,13 +39,13 @@ async function createOrPromoteAdminFromEnv({ requireConfigured = false } = {}) {
     existing.fullName = fullName || existing.fullName;
     existing.updatedAt = new Date().toISOString();
     users[existingIndex] = existing.toObject();
-    writeJsonArray(USERS_FILE, users);
+    await writeJsonArray(USERS_FILE, users);
     return { configured: true, changed: true, action: 'updated', email };
   }
 
   const admin = new User({ fullName, email, passwordHash, role: 'admin' });
   users.push(admin.toObject());
-  writeJsonArray(USERS_FILE, users);
+  await writeJsonArray(USERS_FILE, users);
   return { configured: true, changed: true, action: 'created', email };
 }
 

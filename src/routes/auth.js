@@ -55,7 +55,7 @@ router.post('/register', async (req, res) => {
       errors.push('Password must be at least 6 characters');
     }
 
-    const users = readJsonArray('users.json').map(user => new User(user));
+    const users = (await readJsonArray('users.json')).map(user => new User(user));
     const emailExists = users.some(user => user.email === normalizedEmail);
 
     if (emailExists) {
@@ -74,7 +74,7 @@ router.post('/register', async (req, res) => {
     });
 
     users.push(user);
-    writeJsonArray('users.json', users.map(item => item.toObject()));
+    await writeJsonArray('users.json', users.map(item => item.toObject()));
 
     return res.status(201).json({
       success: true,
@@ -109,7 +109,7 @@ router.post('/login', async (req, res) => {
       return validationError(res, errors);
     }
 
-    const users = readJsonArray('users.json').map(user => new User(user));
+    const users = (await readJsonArray('users.json')).map(user => new User(user));
     const user = users.find(item => item.email === normalizedEmail);
     const passwordMatches = user ? await bcrypt.compare(password, user.passwordHash) : false;
 

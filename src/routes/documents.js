@@ -10,6 +10,11 @@ const {
   getDocumentMetadataPath,
   resolveDocumentFilePath
 } = require('../config/storage');
+const {
+  getSupabaseClient,
+  getSupabaseStorageBucket,
+  isSupabaseStorageConfigured
+} = require('../config/supabase');
 const { readJsonArray, writeJsonArray } = require('../utils/jsonStore');
 
 const router = express.Router();
@@ -33,17 +38,21 @@ const allowedExtensions = [
   '.jpeg'
 ];
 
-fs.mkdirSync(uploadDirectory, { recursive: true });
+if (!isSupabaseStorageConfigured()) {
+  fs.mkdirSync(uploadDirectory, { recursive: true });
+}
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDirectory);
-  },
-  filename: (req, file, cb) => {
-    const extension = path.extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${extension}`);
-  }
-});
+const storage = isSupabaseStorageConfigured()
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => {
+        cb(null, uploadDirectory);
+      },
+      filename: (req, file, cb) => {
+        const extension = path.extname(file.originalname).toLowerCase();
+        cb(null, `${uuidv4()}${extension}`);
+      }
+    });
 
 const upload = multer({
   storage,
@@ -75,6 +84,52 @@ function removeUploadedFile(file) {
   }
 }
 
+function storageObjectPath(storedName) {
+  return `documents/${storedName}`;
+}
+
+async function persistUploadedFile(file) {
+  if (!isSupabaseStorageConfigured()) {
+    return file.filename;
+  }
+
+  const extension = path.extname(file.originalname).toLowerCase();
+  const storedName = `${uuidv4()}${extension}`;
+  const supabase = getSupabaseClient();
+  const bucket = getSupabaseStorageBucket();
+  const { error } = await supabase.storage
+    .from(bucket)
+    .upload(storageObjectPath(storedName), file.buffer, {
+      contentType: file.mimetype,
+      upsert: false
+    });
+
+  if (error) {
+    throw new Error(`Document upload failed: ${error.message}`);
+  }
+
+  return storedName;
+}
+
+async function removeStoredFile(document) {
+  if (isSupabaseStorageConfigured()) {
+    const supabase = getSupabaseClient();
+    const bucket = getSupabaseStorageBucket();
+    const { error } = await supabase.storage
+      .from(bucket)
+      .remove([storageObjectPath(document.storedName)]);
+    if (error) {
+      throw new Error(`Document delete failed: ${error.message}`);
+    }
+    return;
+  }
+
+  const absolutePath = resolveDocumentFilePath(document);
+  if (absolutePath && fs.existsSync(absolutePath)) {
+    fs.unlinkSync(absolutePath);
+  }
+}
+
 function handleUpload(req, res, next) {
   upload.single('file')(req, res, error => {
     if (!error) {
@@ -89,100 +144,115 @@ function handleUpload(req, res, next) {
   });
 }
 
-router.get('/', requireAuth, (req, res) => {
-  const documents = readJsonArray('userDocuments.json')
-    .map(document => new UserDocument(document))
-    .filter(document => document.userId === req.user.id)
-    .map(document => document.toObject());
+router.get('/', requireAuth, async (req, res) => {
+  try {
+    const documents = (await readJsonArray('userDocuments.json'))
+      .map(document => new UserDocument(document))
+      .filter(document => document.userId === req.user.id)
+      .map(document => document.toObject());
 
-  return res.json({
-    success: true,
-    count: documents.length,
-    documents
-  });
+    return res.json({
+      success: true,
+      count: documents.length,
+      documents
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error fetching documents', error: error.message });
+  }
 });
 
-router.post('/', requireAuth, handleUpload, (req, res) => {
-  const { documentType } = req.body;
-  const errors = [];
+router.post('/', requireAuth, handleUpload, async (req, res) => {
+  try {
+    const { documentType } = req.body;
+    const errors = [];
 
-  if (!documentType) {
-    errors.push('Document type is required');
-  } else if (!UserDocument.getDocumentTypes().includes(documentType)) {
-    errors.push('Document type must be one of the allowed values');
-  }
+    if (!documentType) {
+      errors.push('Document type is required');
+    } else if (!UserDocument.getDocumentTypes().includes(documentType)) {
+      errors.push('Document type must be one of the allowed values');
+    }
 
-  if (!req.file) {
-    errors.push('File is required');
-  }
+    if (!req.file) {
+      errors.push('File is required');
+    }
 
-  if (errors.length > 0) {
+    if (errors.length > 0) {
+      removeUploadedFile(req.file);
+      return validationError(res, errors);
+    }
+
+    const storedName = await persistUploadedFile(req.file);
+
+    const document = new UserDocument({
+      userId: req.user.id,
+      documentType,
+      originalName: req.file.originalname,
+      storedName,
+      filePath: getDocumentMetadataPath(storedName),
+      mimeType: req.file.mimetype,
+      size: req.file.size
+    });
+
+    const documents = (await readJsonArray('userDocuments.json')).map(item => new UserDocument(item));
+    documents.push(document);
+    await writeJsonArray('userDocuments.json', documents.map(item => item.toObject()));
+
+    return res.status(201).json({
+      success: true,
+      message: 'Document uploaded successfully',
+      document: document.toObject()
+    });
+  } catch (error) {
     removeUploadedFile(req.file);
-    return validationError(res, errors);
+    return res.status(500).json({ success: false, message: error.message });
   }
-
-  const document = new UserDocument({
-    userId: req.user.id,
-    documentType,
-    originalName: req.file.originalname,
-    storedName: req.file.filename,
-    filePath: getDocumentMetadataPath(req.file.filename),
-    mimeType: req.file.mimetype,
-    size: req.file.size
-  });
-
-  const documents = readJsonArray('userDocuments.json').map(item => new UserDocument(item));
-  documents.push(document);
-  writeJsonArray('userDocuments.json', documents.map(item => item.toObject()));
-
-  return res.status(201).json({
-    success: true,
-    message: 'Document uploaded successfully',
-    document: document.toObject()
-  });
 });
 
-router.get('/:id', requireAuth, (req, res) => {
-  const documents = readJsonArray('userDocuments.json').map(document => new UserDocument(document));
-  const document = documents.find(item => item.id === req.params.id && item.userId === req.user.id);
+router.get('/:id', requireAuth, async (req, res) => {
+  try {
+    const documents = (await readJsonArray('userDocuments.json')).map(document => new UserDocument(document));
+    const document = documents.find(item => item.id === req.params.id && item.userId === req.user.id);
 
-  if (!document) {
-    return res.status(404).json({
-      success: false,
-      message: 'Document not found'
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    return res.json({
+      success: true,
+      document: document.toObject()
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error fetching document', error: error.message });
   }
-
-  return res.json({
-    success: true,
-    document: document.toObject()
-  });
 });
 
-router.delete('/:id', requireAuth, (req, res) => {
-  const documents = readJsonArray('userDocuments.json').map(document => new UserDocument(document));
-  const documentIndex = documents.findIndex(item => item.id === req.params.id && item.userId === req.user.id);
+router.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const documents = (await readJsonArray('userDocuments.json')).map(document => new UserDocument(document));
+    const documentIndex = documents.findIndex(item => item.id === req.params.id && item.userId === req.user.id);
 
-  if (documentIndex === -1) {
-    return res.status(404).json({
-      success: false,
-      message: 'Document not found'
+    if (documentIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    const [document] = documents.splice(documentIndex, 1);
+    await removeStoredFile(document);
+
+    await writeJsonArray('userDocuments.json', documents.map(item => item.toObject()));
+
+    return res.json({
+      success: true,
+      message: 'Document deleted successfully'
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error deleting document', error: error.message });
   }
-
-  const [document] = documents.splice(documentIndex, 1);
-  const absolutePath = resolveDocumentFilePath(document);
-
-  if (absolutePath && fs.existsSync(absolutePath)) {
-    fs.unlinkSync(absolutePath);
-  }
-
-  writeJsonArray('userDocuments.json', documents.map(item => item.toObject()));
-
-  return res.json({
-    success: true,
-    message: 'Document deleted successfully'
-  });
 });
 
 module.exports = router;

@@ -1,5 +1,5 @@
-const app = require('./app');
 const { port } = require('./config/env');
+const app = require('./app');
 const { createOrPromoteAdminFromEnv } = require('./services/adminBootstrapService');
 
 async function start() {

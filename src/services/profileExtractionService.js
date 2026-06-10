@@ -58,8 +58,8 @@ function isMeaningful(value) {
   return true;
 }
 
-function loadProfileRecord(userId) {
-  const profiles = readJsonArray(PROFILES_FILE).map(p => new UserProfile(p));
+async function loadProfileRecord(userId) {
+  const profiles = (await readJsonArray(PROFILES_FILE)).map(p => new UserProfile(p));
   const index = profiles.findIndex(p => p.userId === userId);
   return { profiles, index };
 }
@@ -157,7 +157,7 @@ async function extractAndUpdate(userId, text) {
     };
   }
 
-  const { profiles, index } = loadProfileRecord(userId);
+  const { profiles, index } = await loadProfileRecord(userId);
   let profile;
   if (index === -1) {
     profile = new UserProfile({ userId });
@@ -171,7 +171,7 @@ async function extractAndUpdate(userId, text) {
   if (Object.keys(applied).length > 0) {
     profile.updatedAt = new Date().toISOString();
     const next = profiles.map(p => p.toObject());
-    writeJsonArray(PROFILES_FILE, next);
+    await writeJsonArray(PROFILES_FILE, next);
   }
 
   const updates = describeApplied(applied);

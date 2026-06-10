@@ -10,7 +10,7 @@ function authError(res) {
   });
 }
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const header = req.get('Authorization') || '';
   const [scheme, token] = header.split(' ');
 
@@ -20,7 +20,7 @@ function requireAuth(req, res, next) {
 
   try {
     const payload = jwt.verify(token, jwtSecret);
-    const users = readJsonArray('users.json').map(user => new User(user));
+    const users = (await readJsonArray('users.json')).map(user => new User(user));
     const user = users.find(item => item.id === payload.sub);
 
     if (!user) {
@@ -37,14 +37,14 @@ function requireAuth(req, res, next) {
 // Like requireAuth, but never rejects the request. If a valid token is present
 // req.user is populated; otherwise the request continues anonymously. Used by
 // endpoints that are public but behave differently for signed-in users.
-function optionalAuth(req, res, next) {
+async function optionalAuth(req, res, next) {
   const header = req.get('Authorization') || '';
   const [scheme, token] = header.split(' ');
 
   if (scheme === 'Bearer' && token) {
     try {
       const payload = jwt.verify(token, jwtSecret);
-      const users = readJsonArray('users.json').map(user => new User(user));
+      const users = (await readJsonArray('users.json')).map(user => new User(user));
       const user = users.find(item => item.id === payload.sub);
       if (user) {
         req.user = user.toPublicObject();

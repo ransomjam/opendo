@@ -80,9 +80,9 @@ function detectIntent(message) {
   return 'unclear';
 }
 
-function loadOpportunityMap() {
+async function loadOpportunityMap() {
   const map = new Map();
-  readJsonArray(OPPORTUNITIES_FILE).forEach(data => {
+  (await readJsonArray(OPPORTUNITIES_FILE)).forEach(data => {
     const opp = new Opportunity(data);
     map.set(opp.id, opp.toObject());
   });
@@ -90,9 +90,9 @@ function loadOpportunityMap() {
 }
 
 // Join matches with their opportunity details into card-shaped results.
-function shapeMatches(userId) {
-  const oppMap = loadOpportunityMap();
-  const matches = matchingService.getMatchesForUser(userId);
+async function shapeMatches(userId) {
+  const oppMap = await loadOpportunityMap();
+  const matches = await matchingService.getMatchesForUser(userId);
   return matches
     .map(match => {
       const opp = oppMap.get(match.opportunityId);
@@ -117,10 +117,10 @@ function shapeMatches(userId) {
 
 // ---- "What should I do today?" ---------------------------------------------
 
-function buildTodayPlan(userId) {
-  const oppMap = loadOpportunityMap();
-  const matches = matchingService.getMatchesForUser(userId); // sorted by score desc
-  const actionSteps = readJsonArray(ACTION_STEPS_FILE).filter(s => s.userId === userId);
+async function buildTodayPlan(userId) {
+  const oppMap = await loadOpportunityMap();
+  const matches = await matchingService.getMatchesForUser(userId); // sorted by score desc
+  const actionSteps = (await readJsonArray(ACTION_STEPS_FILE)).filter(s => s.userId === userId);
 
   // Ignore matches the user explicitly set aside.
   const active = matches.filter(m => m.status !== 'ignored' && m.status !== 'submitted');
@@ -280,7 +280,7 @@ async function chat({ userId, message, mode }) {
       } catch (_) {
         // matching still returns whatever is stored
       }
-      const matches = shapeMatches(userId);
+      const matches = await shapeMatches(userId);
       const top = matches[0];
       const message = matches.length
         ? `You have ${matches.length} match${matches.length === 1 ? '' : 'es'}.${top ? ` Your best fit is "${top.title}" (${top.match.matchScore}%).` : ''}`
@@ -289,7 +289,7 @@ async function chat({ userId, message, mode }) {
     }
 
     case 'action_plan': {
-      const plan = buildTodayPlan(userId);
+      const plan = await buildTodayPlan(userId);
       return { ...base, message: renderTodayMessage(plan), plan };
     }
 

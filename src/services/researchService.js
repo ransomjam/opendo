@@ -156,12 +156,12 @@ function buildExtractionPrompt(text) {
   ].join('\n');
 }
 
-function loadOpportunities() {
-  return readJsonArray(OPPORTUNITIES_FILE).map(data => new Opportunity(data));
+async function loadOpportunities() {
+  return (await readJsonArray(OPPORTUNITIES_FILE)).map(data => new Opportunity(data));
 }
 
-function saveOpportunities(opportunities) {
-  writeJsonArray(OPPORTUNITIES_FILE, opportunities.map(opp => opp.toObject()));
+async function saveOpportunities(opportunities) {
+  await writeJsonArray(OPPORTUNITIES_FILE, opportunities.map(opp => opp.toObject()));
 }
 
 // Find an existing opportunity that matches by source link, application link,
@@ -259,7 +259,7 @@ function shapeResult(opportunity, match) {
 
 // Persist one candidate (dedup-aware) and match it to the user.
 async function saveAndMatch(candidate, userId, { matchResults, citations }) {
-  const opportunities = loadOpportunities();
+  const opportunities = await loadOpportunities();
   const duplicate = findDuplicate(opportunities, candidate);
 
   let opportunity;
@@ -267,7 +267,7 @@ async function saveAndMatch(candidate, userId, { matchResults, citations }) {
     // Keep published records authoritative — only fill blanks.
     enrichExisting(duplicate, candidate);
     opportunity = duplicate;
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
   } else {
     opportunity = new Opportunity({
       ...candidate,
@@ -278,7 +278,7 @@ async function saveAndMatch(candidate, userId, { matchResults, citations }) {
       sourceCitations: Array.isArray(citations) ? citations : []
     });
     opportunities.push(opportunity);
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
   }
 
   let match = null;

@@ -9,12 +9,12 @@ const OPPORTUNITIES_FILE = 'opportunities.json';
 const ACTION_STEPS_FILE = 'actionSteps.json';
 
 // GET /api/dashboard/summary - high level numbers for the current user
-router.get('/summary', requireAuth, (req, res) => {
+router.get('/summary', requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
-    const matches = matchingService.getMatchesForUser(userId);
-    const actionSteps = readJsonArray(ACTION_STEPS_FILE).filter(step => step.userId === userId);
-    const opportunities = readJsonArray(OPPORTUNITIES_FILE).map(data => new Opportunity(data));
+    const matches = await matchingService.getMatchesForUser(userId);
+    const actionSteps = (await readJsonArray(ACTION_STEPS_FILE)).filter(step => step.userId === userId);
+    const opportunities = (await readJsonArray(OPPORTUNITIES_FILE)).map(data => new Opportunity(data));
     const opportunityById = new Map(opportunities.map(opp => [opp.id, opp]));
 
     let deadlinesThisWeek = 0;

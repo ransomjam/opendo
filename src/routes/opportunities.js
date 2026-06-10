@@ -9,12 +9,12 @@ const OPPORTUNITIES_FILE = 'opportunities.json';
 
 // Opportunities are persisted to JSON so admin changes survive restarts and are
 // visible to the matching service (a single source of truth).
-function loadOpportunities() {
-  return readJsonArray(OPPORTUNITIES_FILE).map(data => new Opportunity(data));
+async function loadOpportunities() {
+  return (await readJsonArray(OPPORTUNITIES_FILE)).map(data => new Opportunity(data));
 }
 
-function saveOpportunities(opportunities) {
-  writeJsonArray(OPPORTUNITIES_FILE, opportunities.map(opp => opp.toObject()));
+async function saveOpportunities(opportunities) {
+  await writeJsonArray(OPPORTUNITIES_FILE, opportunities.map(opp => opp.toObject()));
 }
 
 function validationError(res, errors) {
@@ -48,7 +48,7 @@ function canView(opportunity, user) {
 }
 
 // GET /api/opportunities - Get all opportunities with filtering
-router.get('/', optionalAuth, (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   try {
     const errors = [];
 
@@ -77,7 +77,7 @@ router.get('/', optionalAuth, (req, res) => {
     }
 
     // Respect visibility first so private research is never leaked to others.
-    let filteredOpportunities = loadOpportunities().filter(opp => canView(opp, req.user));
+    let filteredOpportunities = (await loadOpportunities()).filter(opp => canView(opp, req.user));
 
     // Allow callers to scope to only their own researched/private opportunities.
     if (req.query.mine === 'true' && req.user) {
@@ -152,9 +152,9 @@ router.get('/', optionalAuth, (req, res) => {
 });
 
 // GET /api/opportunities/:id - Get a single opportunity
-router.get('/:id', optionalAuth, (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const opportunity = loadOpportunities().find(opp => opp.id === req.params.id);
+    const opportunity = (await loadOpportunities()).find(opp => opp.id === req.params.id);
 
     if (!opportunity || !canView(opportunity, req.user)) {
       return res.status(404).json({
@@ -193,7 +193,7 @@ router.post('/:id/match', requireAuth, async (req, res) => {
 });
 
 // POST /api/opportunities - Create a new opportunity
-router.post('/', requireAuth, requireAdmin, (req, res) => {
+router.post('/', requireAuth, requireAdmin, async (req, res) => {
   try {
     const opportunity = new Opportunity(req.body);
 
@@ -203,9 +203,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
       return validationError(res, validation.errors);
     }
 
-    const opportunities = loadOpportunities();
+    const opportunities = await loadOpportunities();
     opportunities.push(opportunity);
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
 
     res.status(201).json({
       success: true,
@@ -222,9 +222,9 @@ router.post('/', requireAuth, requireAdmin, (req, res) => {
 });
 
 // PUT /api/opportunities/:id - Update an opportunity
-router.put('/:id', requireAuth, requireAdmin, (req, res) => {
+router.put('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const opportunities = loadOpportunities();
+    const opportunities = await loadOpportunities();
     const opportunityIndex = opportunities.findIndex(opp => opp.id === req.params.id);
 
     if (opportunityIndex === -1) {
@@ -244,7 +244,7 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
     }
 
     opportunities[opportunityIndex] = updatedOpportunity;
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
 
     res.json({
       success: true,
@@ -261,9 +261,9 @@ router.put('/:id', requireAuth, requireAdmin, (req, res) => {
 });
 
 // DELETE /api/opportunities/:id - Delete an opportunity
-router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
+router.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const opportunities = loadOpportunities();
+    const opportunities = await loadOpportunities();
     const opportunityIndex = opportunities.findIndex(opp => opp.id === req.params.id);
 
     if (opportunityIndex === -1) {
@@ -274,7 +274,7 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
     }
 
     opportunities.splice(opportunityIndex, 1);
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
 
     res.json({
       success: true,
@@ -292,9 +292,9 @@ router.delete('/:id', requireAuth, requireAdmin, (req, res) => {
 // POST /api/opportunities/:id/publish - admin publishes a (researched) opportunity
 // globally: status -> published, visibility -> public. This is the ONLY way a
 // personal_research opportunity becomes visible to all users.
-router.post('/:id/publish', requireAuth, requireAdmin, (req, res) => {
+router.post('/:id/publish', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const opportunities = loadOpportunities();
+    const opportunities = await loadOpportunities();
     const opportunity = opportunities.find(opp => opp.id === req.params.id);
 
     if (!opportunity) {
@@ -302,7 +302,7 @@ router.post('/:id/publish', requireAuth, requireAdmin, (req, res) => {
     }
 
     opportunity.update({ status: 'published', visibility: 'public' });
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
 
     res.json({
       success: true,
@@ -315,9 +315,9 @@ router.post('/:id/publish', requireAuth, requireAdmin, (req, res) => {
 });
 
 // PATCH /api/opportunities/:id/status - Update opportunity status
-router.patch('/:id/status', requireAuth, requireAdmin, (req, res) => {
+router.patch('/:id/status', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const opportunities = loadOpportunities();
+    const opportunities = await loadOpportunities();
     const opportunity = opportunities.find(opp => opp.id === req.params.id);
 
     if (!opportunity) {
@@ -339,7 +339,7 @@ router.patch('/:id/status', requireAuth, requireAdmin, (req, res) => {
       return validationError(res, ['Status must be one of the allowed values']);
     }
 
-    saveOpportunities(opportunities);
+    await saveOpportunities(opportunities);
 
     res.json({
       success: true,
