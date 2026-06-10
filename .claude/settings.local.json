@@ -9,7 +9,11 @@
       "Bash(mkdir src/models)",
       "Bash(mkdir src/controllers)",
       "Bash(mkdir src/routes)",
-      "Bash(mkdir src/services)"
+      "Bash(mkdir src/services)",
+      "Bash(git commit *)",
+      "Skill(update-config)",
+      "mcp__ide__executeCode",
+      "Bash(python *)"
     ]
   }
 }
